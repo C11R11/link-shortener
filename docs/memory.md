@@ -1,0 +1,28 @@
+# Project Memory
+
+This file is the living memory for the shortener project.
+
+## Current product idea
+
+Replace Bitly with a branded domain and a small self-hosted redirect service.
+
+## Decisions made so far
+
+- Start with a simple, single-service architecture.
+- Keep redirects fast and boring.
+- Document all major decisions in-repo.
+- Use Postgres as the system of record.
+- Keep analytics lightweight first, heavier later.
+
+## Why this exists
+
+- Control over the domain.
+- Better ownership of links and analytics.
+- Less dependency on third-party shortener pricing or outages.
+
+## Notes from the first planning pass
+
+- The redirect path should not depend on the admin UI.
+- Admin and analytics can evolve separately.
+- We should not overbuild on day one.
+
