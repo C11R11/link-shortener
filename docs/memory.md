@@ -13,6 +13,8 @@ Replace Bitly with a branded domain and a small self-hosted redirect service.
 - Document all major decisions in-repo.
 - Use Postgres as the system of record.
 - Keep analytics lightweight first, heavier later.
+- Run everything in Docker from the start.
+- Set the public domain through environment variables.
 
 ## Why this exists
 
@@ -25,4 +27,3 @@ Replace Bitly with a branded domain and a small self-hosted redirect service.
 - The redirect path should not depend on the admin UI.
 - Admin and analytics can evolve separately.
 - We should not overbuild on day one.
-

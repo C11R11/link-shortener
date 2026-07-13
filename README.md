@@ -24,3 +24,23 @@ Proyecto nuevo. Este repo arranca con la arquitectura y la memoria del proyecto 
 - Analytics simples de clicks.
 - Control de acceso para administracion.
 
+## Desarrollo local con Docker
+
+1. Copiar `.env.example` a `.env`.
+2. Ajustar `SHORTENER_DOMAIN` con el dominio que quieras usar.
+3. Levantar todo con:
+
+```bash
+docker compose up --build
+```
+
+## Endpoints iniciales
+
+- `GET /healthz`
+- `GET /api/links`
+- `POST /api/links`
+- `GET /api/links/:id`
+- `PATCH /api/links/:id`
+- `DELETE /api/links/:id`
+- `GET /api/links/:id/stats`
+- `GET /:slug`
