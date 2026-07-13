@@ -15,6 +15,7 @@ Replace Bitly with a branded domain and a small self-hosted redirect service.
 - Keep analytics lightweight first, heavier later.
 - Run everything in Docker from the start.
 - Set the public domain through environment variables.
+- Apply database migrations on container startup instead of bootstrapping schema in app code.
 
 ## Why this exists
 

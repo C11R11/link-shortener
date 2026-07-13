@@ -4,13 +4,10 @@ import rateLimit from '@fastify/rate-limit';
 import crypto from 'node:crypto';
 import { loadConfig, getBaseUrl } from './config.js';
 import { createLinkService } from './lib/links.js';
-import { ensureSchema } from './db/index.js';
 
 const config = loadConfig();
 const app = Fastify({ logger: true });
 const links = createLinkService(config);
-
-await ensureSchema(links.db);
 
 await app.register(helmet);
 await app.register(rateLimit, {

@@ -34,6 +34,8 @@ Proyecto nuevo. Este repo arranca con la arquitectura y la memoria del proyecto 
 docker compose up --build
 ```
 
+El contenedor del app corre `npm run migrate` antes de arrancar el server.
+
 ## Endpoints iniciales
 
 - `GET /healthz`
