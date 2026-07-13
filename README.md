@@ -39,6 +39,7 @@ El contenedor del app corre `npm run migrate` antes de arrancar el server.
 ## Endpoints iniciales
 
 - `GET /healthz`
+- `GET /admin/dashboard`
 - `GET /api/links`
 - `POST /api/links`
 - `GET /api/links/:id`

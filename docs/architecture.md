@@ -53,6 +53,8 @@ Build a self-hosted link shortener to replace Bitly, using a short branded domai
 
 - Minimal internal interface for creating links and reviewing stats.
 - Can be introduced after the API is stable.
+- Should let the operator choose the redirect status code per link.
+- The first version can be a server-rendered dashboard protected by admin auth.
 
 ### Data store
 
@@ -67,6 +69,7 @@ Build a self-hosted link shortener to replace Bitly, using a short branded domai
 - `id`
 - `slug`
 - `destination_url`
+- `redirect_status_code`
 - `title`
 - `description`
 - `status`
@@ -102,6 +105,7 @@ Build a self-hosted link shortener to replace Bitly, using a short branded domai
 
 ### Admin
 
+- `GET /admin/dashboard`
 - `POST /api/links`
 - `GET /api/links`
 - `GET /api/links/:id`
@@ -158,4 +162,3 @@ Later shape if traffic or complexity grows:
 - Do we need Bitly import from day one?
 - Should we store raw click events forever or roll them up?
 - Do we want per-link custom slugs to be editable after creation?
-

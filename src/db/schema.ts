@@ -5,6 +5,7 @@ export const links = pgTable('links', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: text('slug').notNull(),
   destinationUrl: text('destination_url').notNull(),
+  redirectStatusCode: integer('redirect_status_code').notNull().default(302),
   title: text('title'),
   description: text('description'),
   status: text('status').notNull().default('active'),

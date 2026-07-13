@@ -16,6 +16,7 @@ Replace Bitly with a branded domain and a small self-hosted redirect service.
 - Run everything in Docker from the start.
 - Set the public domain through environment variables.
 - Apply database migrations on container startup instead of bootstrapping schema in app code.
+- Expose a basic admin dashboard and allow per-link redirect status code selection at create/edit time.
 
 ## Why this exists
 

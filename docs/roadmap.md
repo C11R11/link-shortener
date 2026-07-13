@@ -13,6 +13,7 @@
 - Resolve short links to redirects.
 - Basic admin auth.
 - Basic stats.
+- Basic admin dashboard for create/edit flows.
 
 ## Phase 2 - Polishing
 
@@ -20,6 +21,7 @@
 - Expiration and disable switch.
 - Link notes and tags.
 - Better reporting.
+- Per-link redirect status code control.
 
 ## Phase 3 - Hardening
 
@@ -33,4 +35,3 @@
 - Import existing Bitly links.
 - Validate parity with current campaigns.
 - Cut over to own domain.
-

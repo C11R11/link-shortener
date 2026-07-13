@@ -7,6 +7,7 @@ export type LinkRecord = typeof links.$inferSelect;
 export type NewLinkInput = {
   slug: string;
   destinationUrl: string;
+  redirectStatusCode: 301 | 302 | 307 | 308;
   title?: string | null;
   description?: string | null;
   createdBy?: string | null;
@@ -33,6 +34,7 @@ export function createLinkService(config: AppConfig) {
       const [created] = await db.insert(links).values({
         slug: input.slug,
         destinationUrl: input.destinationUrl,
+        redirectStatusCode: input.redirectStatusCode,
         title: input.title ?? null,
         description: input.description ?? null,
         createdBy: input.createdBy ?? null,
@@ -45,6 +47,7 @@ export function createLinkService(config: AppConfig) {
       const nextValues: Partial<{
         slug: string;
         destinationUrl: string;
+        redirectStatusCode: 301 | 302 | 307 | 308;
         title: string | null;
         description: string | null;
         createdBy: string | null;
@@ -54,6 +57,7 @@ export function createLinkService(config: AppConfig) {
       }> = {
         ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
         ...(patch.destinationUrl !== undefined ? { destinationUrl: patch.destinationUrl } : {}),
+        ...(patch.redirectStatusCode !== undefined ? { redirectStatusCode: patch.redirectStatusCode } : {}),
         ...(patch.title !== undefined ? { title: patch.title } : {}),
         ...(patch.description !== undefined ? { description: patch.description } : {}),
         ...(patch.createdBy !== undefined ? { createdBy: patch.createdBy } : {}),
