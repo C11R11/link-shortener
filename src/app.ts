@@ -153,7 +153,7 @@ export function createApp(config: AppConfig, links: LinkService) {
       title: body.title?.trim() || null,
       description: body.description?.trim() || null,
       createdBy: body.createdBy?.trim() || null,
-      expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+      expiresAt: parseDateTimeLocal(body.expiresAt),
     });
 
     return reply.code(201).send({
@@ -186,23 +186,51 @@ export function createApp(config: AppConfig, links: LinkService) {
 
     const rows = items.map((item) => `
       <tr>
-        <td>${escapeHtml(item.slug)}</td>
+        <td>
+          <div><strong>${escapeHtml(item.slug)}</strong></div>
+          <div class="muted">${escapeHtml(item.id)}</div>
+        </td>
         <td><a href="${escapeHtml(`${getBaseUrl(config)}/${item.slug}`)}" target="_blank" rel="noreferrer">${escapeHtml(`${getBaseUrl(config)}/${item.slug}`)}</a></td>
         <td>${escapeHtml(item.destinationUrl)}</td>
         <td>${item.redirectStatusCode}</td>
         <td>${escapeHtml(item.status)}</td>
         <td>${item.clickCount}</td>
         <td>
-          <form method="post" action="/admin/links/${item.id}" class="inline-form">
-            <input type="hidden" name="_method" value="patch" />
-            <select name="redirectStatusCode">
-              ${[301, 302, 307, 308].map((code) => `<option value="${code}"${code === item.redirectStatusCode ? ' selected' : ''}>${code}</option>`).join('')}
-            </select>
-            <select name="status">
-              ${['active', 'disabled', 'archived'].map((status) => `<option value="${status}"${status === item.status ? ' selected' : ''}>${status}</option>`).join('')}
-            </select>
-            <button type="submit">Update</button>
-          </form>
+          <details>
+            <summary>Edit</summary>
+            <form method="post" action="/admin/links/${item.id}" class="edit-form">
+              <input type="hidden" name="_method" value="patch" />
+              <label>Slug
+                <input name="slug" value="${escapeHtml(item.slug)}" />
+              </label>
+              <label>Destination URL
+                <input name="destinationUrl" value="${escapeHtml(item.destinationUrl)}" />
+              </label>
+              <label>Redirect status code
+                <select name="redirectStatusCode">
+                  ${[301, 302, 307, 308].map((code) => `<option value="${code}"${code === item.redirectStatusCode ? ' selected' : ''}>${code}</option>`).join('')}
+                </select>
+              </label>
+              <label>Status
+                <select name="status">
+                  ${['active', 'disabled', 'archived'].map((status) => `<option value="${status}"${status === item.status ? ' selected' : ''}>${status}</option>`).join('')}
+                </select>
+              </label>
+              <label>Expiry
+                <input type="datetime-local" name="expiresAt" value="${formatDateTimeLocal(item.expiresAt)}" />
+              </label>
+              <label>Title
+                <input name="title" value="${escapeHtml(item.title ?? '')}" />
+              </label>
+              <label>Description
+                <input name="description" value="${escapeHtml(item.description ?? '')}" />
+              </label>
+              <label>Created by
+                <input name="createdBy" value="${escapeHtml(item.createdBy ?? '')}" />
+              </label>
+              <button type="submit">Save</button>
+            </form>
+          </details>
         </td>
       </tr>
     `).join('');
@@ -228,6 +256,9 @@ export function createApp(config: AppConfig, links: LinkService) {
           th { color: #8ea1b6; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
           .inline-form { display: flex; gap: 8px; align-items: center; }
           .inline-form select, .inline-form button { padding: 8px 10px; }
+          details { max-width: 420px; }
+          summary { cursor: pointer; color: #7dd3fc; font-weight: 700; margin-bottom: 10px; }
+          .edit-form { margin-top: 10px; display: grid; gap: 10px; }
           a { color: #7dd3fc; }
           .muted { color: #8ea1b6; }
         </style>
@@ -259,10 +290,13 @@ export function createApp(config: AppConfig, links: LinkService) {
                     <option value="archived">archived</option>
                   </select>
                 </label>
+                <label>Title
+                  <input name="title" placeholder="Campaign name" />
+                </label>
+                <label>Expiry
+                  <input type="datetime-local" name="expiresAt" />
+                </label>
               </div>
-              <label>Title
-                <input name="title" placeholder="Campaign name" />
-              </label>
               <label>Description
                 <input name="description" placeholder="Optional notes" />
               </label>
@@ -315,7 +349,7 @@ export function createApp(config: AppConfig, links: LinkService) {
       ...(body.title !== undefined ? { title: body.title?.trim() ?? null } : {}),
       ...(body.description !== undefined ? { description: body.description?.trim() ?? null } : {}),
       ...(body.createdBy !== undefined ? { createdBy: body.createdBy?.trim() ?? null } : {}),
-      ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt ? new Date(body.expiresAt) : null } : {}),
+      ...(body.expiresAt !== undefined ? { expiresAt: parseDateTimeLocal(body.expiresAt) } : {}),
       ...(body.status !== undefined ? { status: body.status } : {}),
     });
 
@@ -412,7 +446,7 @@ export function createApp(config: AppConfig, links: LinkService) {
       title: body.title?.trim() || null,
       description: body.description?.trim() || null,
       createdBy: body.createdBy?.trim() || null,
-      expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+      expiresAt: parseDateTimeLocal(body.expiresAt),
     });
 
     if (body.status && body.status !== 'active') {
@@ -444,7 +478,7 @@ export function createApp(config: AppConfig, links: LinkService) {
       ...(body.title !== undefined ? { title: body.title?.trim() ?? null } : {}),
       ...(body.description !== undefined ? { description: body.description?.trim() ?? null } : {}),
       ...(body.createdBy !== undefined ? { createdBy: body.createdBy?.trim() ?? null } : {}),
-      ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt ? new Date(body.expiresAt) : null } : {}),
+      ...(body.expiresAt !== undefined ? { expiresAt: parseDateTimeLocal(body.expiresAt) } : {}),
       ...(body.status !== undefined ? { status: body.status } : {}),
     });
 
@@ -494,4 +528,26 @@ function escapeHtml(value: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function parseDateTimeLocal(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatDateTimeLocal(value: Date | null | undefined): string {
+  if (!value) {
+    return '';
+  }
+
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
