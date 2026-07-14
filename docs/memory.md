@@ -17,6 +17,7 @@ Replace Bitly with a branded domain and a small self-hosted redirect service.
 - Set the public domain through environment variables.
 - Apply database migrations on container startup instead of bootstrapping schema in app code.
 - Expose a basic admin dashboard and allow per-link redirect status code selection at create/edit time.
+- Reporting should surface click history by day/hour and normalized referrer domains before we add any migration/import story.
 
 ## Why this exists
 

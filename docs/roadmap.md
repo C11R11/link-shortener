@@ -21,7 +21,7 @@
 - Custom slugs.
 - Expiration and disable switch.
 - Link notes and tags.
-- Better reporting.
+- Better reporting: click history charts by day and hour, plus referrer breakdown.
 - Per-link redirect status code control.
 
 ## Phase 3 - Hardening
@@ -30,9 +30,3 @@
 - Abuse prevention.
 - Observability and alerts.
 - Backup and restore flow.
-
-## Phase 4 - Migration
-
-- Import existing Bitly links.
-- Validate parity with current campaigns.
-- Cut over to own domain.

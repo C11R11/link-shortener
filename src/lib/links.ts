@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import type { AppConfig } from '../config.js';
 import { createDb } from '../db/index.js';
 import { linkClicks, links } from '../db/schema.js';
@@ -18,6 +18,14 @@ export type LinkStats = {
   link: LinkRecord;
   totalClicks: number;
   clicksLast7Days: number;
+  clicksByDay: Array<{
+    bucket: string;
+    count: number;
+  }>;
+  clicksByHour: Array<{
+    bucket: string;
+    count: number;
+  }>;
   topReferrers: Array<{
     referrer: string;
     count: number;
@@ -121,10 +129,28 @@ export function createLinkService(config: AppConfig) {
       const [recent7Row] = await db.select({ count: count() }).from(linkClicks).where(
         and(eq(linkClicks.linkId, id), gte(linkClicks.clickedAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))),
       );
-      const referrerRows = await db.select({
-        referrer: linkClicks.referrer,
-        count: count(),
-      }).from(linkClicks).where(eq(linkClicks.linkId, id)).groupBy(linkClicks.referrer);
+      const [dailyRows, hourlyRows, referrerRows] = await Promise.all([
+        db.select({
+          bucket: sql<string>`to_char(date_trunc('day', (${linkClicks.clickedAt} AT TIME ZONE 'UTC')), 'YYYY-MM-DD')`,
+          count: count(),
+        })
+          .from(linkClicks)
+          .where(and(eq(linkClicks.linkId, id), gte(linkClicks.clickedAt, new Date(Date.now() - 14 * 24 * 60 * 60 * 1000))))
+          .groupBy(sql<string>`to_char(date_trunc('day', (${linkClicks.clickedAt} AT TIME ZONE 'UTC')), 'YYYY-MM-DD')`)
+          .orderBy(sql<string>`to_char(date_trunc('day', (${linkClicks.clickedAt} AT TIME ZONE 'UTC')), 'YYYY-MM-DD')`),
+        db.select({
+          bucket: sql<string>`to_char(date_trunc('hour', (${linkClicks.clickedAt} AT TIME ZONE 'UTC')), 'YYYY-MM-DD HH24:00')`,
+          count: count(),
+        })
+          .from(linkClicks)
+          .where(and(eq(linkClicks.linkId, id), gte(linkClicks.clickedAt, new Date(Date.now() - 24 * 60 * 60 * 1000))))
+          .groupBy(sql<string>`to_char(date_trunc('hour', (${linkClicks.clickedAt} AT TIME ZONE 'UTC')), 'YYYY-MM-DD HH24:00')`)
+          .orderBy(sql<string>`to_char(date_trunc('hour', (${linkClicks.clickedAt} AT TIME ZONE 'UTC')), 'YYYY-MM-DD HH24:00')`),
+        db.select({
+          referrer: linkClicks.referrer,
+          count: count(),
+        }).from(linkClicks).where(eq(linkClicks.linkId, id)).groupBy(linkClicks.referrer),
+      ]);
       const recentClicks = await db.select({
         clickedAt: linkClicks.clickedAt,
         referrer: linkClicks.referrer,
@@ -136,15 +162,47 @@ export function createLinkService(config: AppConfig) {
         link,
         totalClicks: Number(totalRow?.count ?? 0),
         clicksLast7Days: Number(recent7Row?.count ?? 0),
+        clicksByDay: dailyRows.map((row) => ({
+          bucket: String(row.bucket),
+          count: Number(row.count),
+        })),
+        clicksByHour: hourlyRows.map((row) => ({
+          bucket: String(row.bucket),
+          count: Number(row.count),
+        })),
         topReferrers: referrerRows
           .map((row) => ({
-            referrer: row.referrer ?? '(direct)',
+            referrer: normalizeReferrer(row.referrer),
             count: Number(row.count),
           }))
+          .reduce<Array<{ referrer: string; count: number }>>((acc, row) => {
+            const existing = acc.find((item) => item.referrer === row.referrer);
+            if (existing) {
+              existing.count += row.count;
+              return acc;
+            }
+
+            acc.push({ ...row });
+            return acc;
+          }, [])
           .sort((a, b) => b.count - a.count)
           .slice(0, 5),
         recentClicks,
       };
     },
   };
+}
+
+function normalizeReferrer(referrer: string | null): string {
+  const raw = referrer?.trim();
+  if (!raw) {
+    return '(direct)';
+  }
+
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return url.hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return raw.length > 80 ? `${raw.slice(0, 77)}...` : raw;
+  }
 }

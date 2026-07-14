@@ -26,6 +26,14 @@ export type LinkStats = {
   link: LinkRecord;
   totalClicks: number;
   clicksLast7Days: number;
+  clicksByDay: Array<{
+    bucket: string;
+    count: number;
+  }>;
+  clicksByHour: Array<{
+    bucket: string;
+    count: number;
+  }>;
   topReferrers: Array<{
     referrer: string;
     count: number;
@@ -204,7 +212,9 @@ export function createApp(config: AppConfig, links: LinkService) {
 
     const rows = items.map((item) => {
       const stats = statsById.get(item.id);
-      const topReferrer = stats?.topReferrers[0]?.referrer ?? 'n/a';
+      const statsSummaryHtml = stats ? renderStatsSummary(stats) : renderEmptyStatsSummary();
+      const timelineHtml = stats ? renderClickTimeline(stats) : renderEmptyTimeline();
+      const referrerHtml = stats ? renderReferrerList(stats.topReferrers, stats.totalClicks) : renderEmptyReferrerList();
       return `
       <tr>
         <td>
@@ -215,10 +225,19 @@ export function createApp(config: AppConfig, links: LinkService) {
         <td>${escapeHtml(item.destinationUrl)}</td>
         <td>${item.redirectStatusCode}</td>
         <td>${escapeHtml(item.status)}</td>
-        <td>
-          <div><strong>${stats?.totalClicks ?? item.clickCount}</strong> total</div>
-          <div class="muted">${stats?.clicksLast7Days ?? 0} last 7d</div>
-          <div class="muted">${escapeHtml(topReferrer)}</div>
+        <td class="stats-cell">
+          ${statsSummaryHtml}
+          <div class="stats-note muted">${escapeHtml(formatDisplayDate(stats?.link.lastClickedAt ?? item.lastClickedAt))}</div>
+          <details class="stats-details">
+            <summary>Ver distribución</summary>
+            <div class="stats-panels">
+              ${timelineHtml}
+            </div>
+            <section class="referrer-panel">
+              <h3>Referidos</h3>
+              ${referrerHtml}
+            </section>
+          </details>
         </td>
         <td>
           <details>
@@ -287,6 +306,69 @@ export function createApp(config: AppConfig, links: LinkService) {
           .edit-form { margin-top: 10px; display: grid; gap: 10px; }
           a { color: #7dd3fc; }
           .muted { color: #8ea1b6; }
+          .stats-cell { min-width: 360px; }
+          .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+          }
+          .stats-summary-empty { opacity: 0.9; }
+          .stats-metric {
+            background: #0d141d;
+            border: 1px solid #243042;
+            border-radius: 12px;
+            padding: 10px 12px;
+            display: grid;
+            gap: 4px;
+          }
+          .stats-metric span {
+            color: #8ea1b6;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+          }
+          .stats-metric strong {
+            color: #e8eef6;
+            font-size: 13px;
+            line-height: 1.2;
+            word-break: break-word;
+          }
+          .stats-metric small {
+            color: #8ea1b6;
+            font-size: 11px;
+          }
+          .stats-note { margin-top: 10px; }
+          .stats-details { margin-top: 14px; max-width: 100%; }
+          .stats-details summary { margin-bottom: 12px; }
+          .stats-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+          .chart-panel, .referrer-panel {
+            background: #0d141d;
+            border: 1px solid #243042;
+            border-radius: 14px;
+            padding: 12px;
+          }
+          .chart-panel h3, .referrer-panel h3 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #8ea1b6;
+          }
+          .chart-shell { display: grid; gap: 8px; }
+          .chart-caption { display: flex; justify-content: space-between; gap: 12px; color: #8ea1b6; font-size: 12px; }
+          .chart-svg { width: 100%; height: auto; overflow: visible; }
+          .chart-axis { fill: #8ea1b6; font-size: 10px; }
+          .chart-bar { fill: #7dd3fc; }
+          .chart-bar-empty { fill: #243042; }
+          .referrer-list { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+          .referrer-list li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+          .referrer-main { display: grid; gap: 2px; min-width: 0; }
+          .referrer-list code { color: #e8eef6; font-size: 13px; }
+          .referrer-list small { color: #8ea1b6; font-size: 11px; }
+          .referrer-list strong { color: #7dd3fc; }
+          @media (max-width: 900px) {
+            .stats-cell { min-width: 280px; }
+          }
         </style>
       </head>
       <body>
@@ -576,4 +658,248 @@ function formatDateTimeLocal(value: Date | null | undefined): string {
   const hours = String(value.getHours()).padStart(2, '0');
   const minutes = String(value.getMinutes()).padStart(2, '0');
   return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function formatDisplayDate(value: Date | null | undefined): string {
+  if (!value) {
+    return 'Last click: n/a';
+  }
+
+  return `Last click: ${value.toLocaleString('es-AR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })}`;
+}
+
+function renderStatsSummary(stats: LinkStats): string {
+  const daily = buildBucketSeries(stats.clicksByDay, 14, 'day');
+  const hourly = buildBucketSeries(stats.clicksByHour, 24, 'hour');
+  const peakDay = findPeakPoint(daily);
+  const peakHour = findPeakPoint(hourly);
+  const topReferrer = stats.topReferrers[0];
+
+  return `
+    <div class="stats-summary">
+      <div class="stats-metric">
+        <span>Total</span>
+        <strong>${stats.totalClicks}</strong>
+      </div>
+      <div class="stats-metric">
+        <span>Últimos 7 días</span>
+        <strong>${stats.clicksLast7Days}</strong>
+      </div>
+      <div class="stats-metric">
+        <span>Pico por día</span>
+        <strong>${escapeHtml(peakDay ? peakDay.label : 'n/a')}</strong>
+        <small>${peakDay?.count ?? 0} clicks</small>
+      </div>
+      <div class="stats-metric">
+        <span>Pico por hora</span>
+        <strong>${escapeHtml(peakHour ? peakHour.label : 'n/a')}</strong>
+        <small>${peakHour?.count ?? 0} clicks</small>
+      </div>
+      <div class="stats-metric">
+        <span>Top referido</span>
+        <strong>${escapeHtml(topReferrer?.referrer ?? 'n/a')}</strong>
+        <small>${topReferrer ? `${topReferrer.count} clicks` : 'Sin datos'}</small>
+      </div>
+    </div>
+  `;
+}
+
+function renderEmptyStatsSummary(): string {
+  return `
+    <div class="stats-summary stats-summary-empty">
+      <div class="stats-metric">
+        <span>Total</span>
+        <strong>0</strong>
+      </div>
+      <div class="stats-metric">
+        <span>Últimos 7 días</span>
+        <strong>0</strong>
+      </div>
+      <div class="stats-metric">
+        <span>Pico por día</span>
+        <strong>n/a</strong>
+        <small>Sin clicks</small>
+      </div>
+      <div class="stats-metric">
+        <span>Pico por hora</span>
+        <strong>n/a</strong>
+        <small>Sin clicks</small>
+      </div>
+      <div class="stats-metric">
+        <span>Top referido</span>
+        <strong>n/a</strong>
+        <small>Sin datos</small>
+      </div>
+    </div>
+  `;
+}
+
+function renderClickTimeline(stats: LinkStats): string {
+  const daily = buildBucketSeries(stats.clicksByDay, 14, 'day');
+  const hourly = buildBucketSeries(stats.clicksByHour, 24, 'hour');
+
+  return `
+    <section class="chart-panel">
+      <h3>Clicks por día (UTC)</h3>
+      ${renderHistogram(daily, 320, 140, 'días')}
+    </section>
+    <section class="chart-panel">
+      <h3>Clicks por hora (UTC)</h3>
+      ${renderHistogram(hourly, 420, 140, 'horas')}
+    </section>
+  `;
+}
+
+function renderEmptyTimeline(): string {
+  return `
+    <section class="chart-panel">
+      <h3>Clicks por día (UTC)</h3>
+      <p class="muted">Todavía no hay clicks.</p>
+    </section>
+    <section class="chart-panel">
+      <h3>Clicks por hora (UTC)</h3>
+      <p class="muted">Todavía no hay clicks.</p>
+    </section>
+  `;
+}
+
+function findPeakPoint(points: Array<{ label: string; count: number }>): { label: string; count: number } | null {
+  const peak = points.reduce<{ label: string; count: number } | null>((current, point) => {
+    if (!current || point.count > current.count) {
+      return point;
+    }
+
+    return current;
+  }, null);
+
+  return peak && peak.count > 0 ? peak : null;
+}
+
+function renderHistogram(points: Array<{ label: string; count: number }>, width: number, height: number, axisLabel: string): string {
+  const maxValue = Math.max(...points.map((point) => point.count), 1);
+  const paddingTop = 12;
+  const paddingRight = 10;
+  const paddingBottom = 28;
+  const paddingLeft = 10;
+  const plotWidth = width - paddingLeft - paddingRight;
+  const plotHeight = height - paddingTop - paddingBottom;
+  const barWidth = plotWidth / Math.max(points.length, 1);
+
+  const bars = points.map((point, index) => {
+    const barHeight = point.count === 0 ? 0 : Math.max(4, (point.count / maxValue) * plotHeight);
+    const x = paddingLeft + (index * barWidth) + 2;
+    const y = paddingTop + plotHeight - barHeight;
+    const labelX = x + (barWidth - 4) / 2;
+    const showLabel = points.length <= 14 || index % Math.max(1, Math.ceil(points.length / 7)) === 0;
+    return `
+      <g>
+        <title>${escapeHtml(`${point.label}: ${point.count} clicks`)}</title>
+        <rect class="${point.count > 0 ? 'chart-bar' : 'chart-bar-empty'}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${Math.max(barWidth - 4, 2).toFixed(2)}" height="${barHeight.toFixed(2)}" rx="5" />
+        ${showLabel ? `<text class="chart-axis" x="${labelX.toFixed(2)}" y="${height - 10}" text-anchor="middle">${escapeHtml(point.label)}</text>` : ''}
+      </g>
+    `;
+  }).join('');
+
+  return `
+    <div class="chart-shell">
+      <div class="chart-caption">
+        <span>${escapeHtml(axisLabel)}</span>
+        <span>${points.reduce((sum, point) => sum + point.count, 0)} clicks</span>
+      </div>
+      <svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Histograma de clicks por ${escapeHtml(axisLabel)}">
+        ${bars}
+      </svg>
+    </div>
+  `;
+}
+
+function renderReferrerList(rows: Array<{ referrer: string; count: number }>, totalClicks: number): string {
+  if (rows.length === 0) {
+    return '<p class="muted">Sin referidos.</p>';
+  }
+
+  return `
+    <ul class="referrer-list">
+      ${rows
+        .map((row) => `
+          <li>
+            <div class="referrer-main">
+              <code>${escapeHtml(row.referrer)}</code>
+              <small>${formatShare(row.count, totalClicks)}</small>
+            </div>
+            <strong>${row.count}</strong>
+          </li>
+        `)
+        .join('')}
+    </ul>
+  `;
+}
+
+function renderEmptyReferrerList(): string {
+  return '<p class="muted">Sin referidos.</p>';
+}
+
+function formatShare(value: number, total: number): string {
+  if (total <= 0) {
+    return '0%';
+  }
+
+  return `${((value / total) * 100).toFixed(1)}%`;
+}
+
+function buildBucketSeries(
+  rows: Array<{ bucket: string; count: number }>,
+  totalBuckets: number,
+  granularity: 'day' | 'hour',
+): Array<{ label: string; count: number }> {
+  const map = new Map(rows.map((row) => [row.bucket, Number(row.count)]));
+  const result: Array<{ label: string; count: number }> = [];
+  const now = new Date();
+
+  for (let index = totalBuckets - 1; index >= 0; index -= 1) {
+    const bucketDate = granularity === 'day'
+      ? shiftUtcDay(now, index)
+      : shiftUtcHour(now, index);
+    result.push({
+      label: granularity === 'day' ? formatUtcDayLabel(bucketDate) : formatUtcHourLabel(bucketDate),
+      count: map.get(formatUtcBucket(bucketDate, granularity)) ?? 0,
+    });
+  }
+
+  return result;
+}
+
+function shiftUtcDay(now: Date, offset: number): Date {
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  date.setUTCDate(date.getUTCDate() - offset);
+  return date;
+}
+
+function shiftUtcHour(now: Date, offset: number): Date {
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()));
+  date.setUTCHours(date.getUTCHours() - offset);
+  return date;
+}
+
+function formatUtcBucket(date: Date, granularity: 'day' | 'hour'): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  if (granularity === 'day') {
+    return `${year}-${month}-${day}`;
+  }
+
+  const hour = String(date.getUTCHours()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hour}:00`;
+}
+
+function formatUtcDayLabel(date: Date): string {
+  return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatUtcHourLabel(date: Date): string {
+  return `${String(date.getUTCHours()).padStart(2, '0')}h`;
 }
