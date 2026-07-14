@@ -36,6 +36,14 @@ docker compose up --build
 
 El contenedor del app corre `npm run migrate` antes de arrancar el server.
 
+## Imagen publicada
+
+El workflow de GitHub publica la imagen en GHCR:
+
+```bash
+ghcr.io/pablokbs/link-shortener:latest
+```
+
 ## Endpoints iniciales
 
 - `GET /healthz`
