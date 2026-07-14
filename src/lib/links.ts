@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNull } from 'drizzle-orm';
 import type { AppConfig } from '../config.js';
 import { createDb } from '../db/index.js';
 import { linkClicks, links } from '../db/schema.js';
@@ -12,6 +12,22 @@ export type NewLinkInput = {
   description?: string | null;
   createdBy?: string | null;
   expiresAt?: Date | null;
+};
+
+export type LinkStats = {
+  link: LinkRecord;
+  totalClicks: number;
+  clicksLast7Days: number;
+  topReferrers: Array<{
+    referrer: string;
+    count: number;
+  }>;
+  recentClicks: Array<{
+    clickedAt: Date;
+    referrer: string | null;
+    userAgent: string | null;
+    country: string | null;
+  }>;
 };
 
 export function createLinkService(config: AppConfig) {
@@ -95,16 +111,38 @@ export function createLinkService(config: AppConfig) {
         }).where(eq(links.id, link.id));
       });
     },
-    async getLinkStats(id: string) {
+    async getLinkStats(id: string): Promise<LinkStats | null> {
       const [link] = await db.select().from(links).where(eq(links.id, id)).limit(1);
       if (!link) {
         return null;
       }
 
-      const recentClicks = await db.select().from(linkClicks).where(eq(linkClicks.linkId, id)).orderBy(desc(linkClicks.clickedAt)).limit(10);
+      const [totalRow] = await db.select({ count: count() }).from(linkClicks).where(eq(linkClicks.linkId, id));
+      const [recent7Row] = await db.select({ count: count() }).from(linkClicks).where(
+        and(eq(linkClicks.linkId, id), gte(linkClicks.clickedAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))),
+      );
+      const referrerRows = await db.select({
+        referrer: linkClicks.referrer,
+        count: count(),
+      }).from(linkClicks).where(eq(linkClicks.linkId, id)).groupBy(linkClicks.referrer);
+      const recentClicks = await db.select({
+        clickedAt: linkClicks.clickedAt,
+        referrer: linkClicks.referrer,
+        userAgent: linkClicks.userAgent,
+        country: linkClicks.country,
+      }).from(linkClicks).where(eq(linkClicks.linkId, id)).orderBy(desc(linkClicks.clickedAt)).limit(10);
 
       return {
         link,
+        totalClicks: Number(totalRow?.count ?? 0),
+        clicksLast7Days: Number(recent7Row?.count ?? 0),
+        topReferrers: referrerRows
+          .map((row) => ({
+            referrer: row.referrer ?? '(direct)',
+            count: Number(row.count),
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5),
         recentClicks,
       };
     },

@@ -22,6 +22,22 @@ export type LinkRecord = {
   updatedAt?: Date;
 };
 
+export type LinkStats = {
+  link: LinkRecord;
+  totalClicks: number;
+  clicksLast7Days: number;
+  topReferrers: Array<{
+    referrer: string;
+    count: number;
+  }>;
+  recentClicks: Array<{
+    clickedAt: Date;
+    referrer: string | null;
+    userAgent: string | null;
+    country: string | null;
+  }>;
+};
+
 export type LinkService = {
   listLinks(): Promise<LinkRecord[]>;
   getLinkBySlug(slug: string): Promise<LinkRecord | null>;
@@ -53,10 +69,7 @@ export type LinkService = {
     link: LinkRecord,
     event: { referrer?: string | null; userAgent?: string | null; country?: string | null; ipHash?: string | null },
   ): Promise<void>;
-  getLinkStats(id: string): Promise<{
-    link: LinkRecord;
-    recentClicks: Array<Record<string, unknown>>;
-  } | null>;
+  getLinkStats(id: string): Promise<LinkStats | null>;
 };
 
 export function createApp(config: AppConfig, links: LinkService) {
@@ -179,12 +192,20 @@ export function createApp(config: AppConfig, links: LinkService) {
   app.get('/admin/dashboard', async (request, reply) => {
     requireAdmin(request);
     const items = await links.listLinks();
+    const statsById = new Map(
+      await Promise.all(
+        items.map(async (item) => [item.id, await links.getLinkStats(item.id)] as const),
+      ),
+    );
 
     const options = [301, 302, 307, 308]
       .map((code) => `<option value="${code}"${code === config.REDIRECT_STATUS_CODE ? ' selected' : ''}>${code}</option>`)
       .join('');
 
-    const rows = items.map((item) => `
+    const rows = items.map((item) => {
+      const stats = statsById.get(item.id);
+      const topReferrer = stats?.topReferrers[0]?.referrer ?? 'n/a';
+      return `
       <tr>
         <td>
           <div><strong>${escapeHtml(item.slug)}</strong></div>
@@ -194,7 +215,11 @@ export function createApp(config: AppConfig, links: LinkService) {
         <td>${escapeHtml(item.destinationUrl)}</td>
         <td>${item.redirectStatusCode}</td>
         <td>${escapeHtml(item.status)}</td>
-        <td>${item.clickCount}</td>
+        <td>
+          <div><strong>${stats?.totalClicks ?? item.clickCount}</strong> total</div>
+          <div class="muted">${stats?.clicksLast7Days ?? 0} last 7d</div>
+          <div class="muted">${escapeHtml(topReferrer)}</div>
+        </td>
         <td>
           <details>
             <summary>Edit</summary>
@@ -233,7 +258,8 @@ export function createApp(config: AppConfig, links: LinkService) {
           </details>
         </td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
 
     const html = `<!doctype html>
     <html lang="es">
@@ -314,7 +340,7 @@ export function createApp(config: AppConfig, links: LinkService) {
                   <th>Destination</th>
                   <th>Code</th>
                   <th>Status</th>
-                  <th>Clicks</th>
+                  <th>Stats</th>
                   <th>Update</th>
                 </tr>
               </thead>

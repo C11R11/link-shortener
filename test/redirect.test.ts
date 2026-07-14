@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createApp, type LinkService, type LinkRecord } from '../src/app.js';
+import { createApp, type LinkService, type LinkRecord, type LinkStats } from '../src/app.js';
 import type { AppConfig } from '../src/config.js';
 
 const baseConfig: AppConfig = {
@@ -57,7 +57,15 @@ function makeService(link: LinkRecord | null): LinkService & { recordClickCalls:
       this.recordClickCalls += 1;
     },
     async getLinkStats() {
-      return link ? { link, recentClicks: [] } : null;
+      return link
+        ? {
+            link,
+            totalClicks: 0,
+            clicksLast7Days: 0,
+            topReferrers: [],
+            recentClicks: [],
+          } satisfies LinkStats
+        : null;
     },
   };
 }
@@ -115,3 +123,17 @@ test('returns 404 for unknown slugs', async () => {
   assert.equal(service.recordClickCalls, 0);
 });
 
+test('exposes stats payload', async () => {
+  const link = makeLink();
+  const service = makeService(link);
+  const { app, ready } = createApp(baseConfig, service);
+  await ready();
+
+  const response = await app.inject({ method: 'GET', url: '/api/links/link-1/stats', headers: { authorization: 'Bearer change-me' } });
+  const payload = response.json();
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(payload.totalClicks, 0);
+  assert.equal(payload.clicksLast7Days, 0);
+  assert.equal(payload.shortUrl, 'http://test.local/demo');
+});
