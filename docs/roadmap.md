@@ -14,6 +14,7 @@
 - Basic admin auth.
 - Basic stats.
 - Basic admin dashboard for create/edit flows.
+- Redirect test coverage for 301/302/307/308 and failure states.
 
 ## Phase 2 - Polishing
 

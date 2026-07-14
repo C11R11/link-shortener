@@ -7,7 +7,7 @@ export type LinkRecord = typeof links.$inferSelect;
 export type NewLinkInput = {
   slug: string;
   destinationUrl: string;
-  redirectStatusCode: 301 | 302 | 307 | 308;
+  redirectStatusCode: number;
   title?: string | null;
   description?: string | null;
   createdBy?: string | null;
@@ -47,7 +47,7 @@ export function createLinkService(config: AppConfig) {
       const nextValues: Partial<{
         slug: string;
         destinationUrl: string;
-        redirectStatusCode: 301 | 302 | 307 | 308;
+        redirectStatusCode: number;
         title: string | null;
         description: string | null;
         createdBy: string | null;
