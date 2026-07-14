@@ -210,24 +210,34 @@ export function createApp(config: AppConfig, links: LinkService) {
       .map((code) => `<option value="${code}"${code === config.REDIRECT_STATUS_CODE ? ' selected' : ''}>${code}</option>`)
       .join('');
 
-    const rows = items.map((item) => {
+    const cards = items.map((item) => {
       const stats = statsById.get(item.id);
       const statsSummaryHtml = stats ? renderStatsSummary(stats) : renderEmptyStatsSummary();
       const timelineHtml = stats ? renderClickTimeline(stats) : renderEmptyTimeline();
       const referrerHtml = stats ? renderReferrerList(stats.topReferrers, stats.totalClicks) : renderEmptyReferrerList();
       return `
-      <tr>
-        <td>
-          <div><strong>${escapeHtml(item.slug)}</strong></div>
-          <div class="muted">${escapeHtml(item.id)}</div>
-        </td>
-        <td><a href="${escapeHtml(`${getBaseUrl(config)}/${item.slug}`)}" target="_blank" rel="noreferrer">${escapeHtml(`${getBaseUrl(config)}/${item.slug}`)}</a></td>
-        <td>${escapeHtml(item.destinationUrl)}</td>
-        <td>${item.redirectStatusCode}</td>
-        <td>${escapeHtml(item.status)}</td>
-        <td class="stats-cell">
+      <article class="link-card">
+        <div class="link-card__top">
+          <div class="link-card__identity">
+            <div class="link-card__slug-row">
+              <strong>${escapeHtml(item.slug)}</strong>
+              <span class="link-badge">${escapeHtml(item.status)}</span>
+              <span class="link-badge link-badge-soft">${item.redirectStatusCode}</span>
+            </div>
+            <div class="link-card__meta">
+              <a href="${escapeHtml(`${getBaseUrl(config)}/${item.slug}`)}" target="_blank" rel="noreferrer">${escapeHtml(`${getBaseUrl(config)}/${item.slug}`)}</a>
+              <span>•</span>
+              <span>${escapeHtml(item.destinationUrl)}</span>
+            </div>
+            <div class="muted link-card__submeta">${escapeHtml(item.id)}</div>
+          </div>
+          <div class="link-card__updated muted">
+            ${escapeHtml(formatDisplayDate(stats?.link.lastClickedAt ?? item.lastClickedAt))}
+          </div>
+        </div>
+
+        <div class="link-card__stats">
           ${statsSummaryHtml}
-          <div class="stats-note muted">${escapeHtml(formatDisplayDate(stats?.link.lastClickedAt ?? item.lastClickedAt))}</div>
           <details class="stats-details">
             <summary>Ver distribución</summary>
             <div class="stats-panels">
@@ -238,12 +248,13 @@ export function createApp(config: AppConfig, links: LinkService) {
               ${referrerHtml}
             </section>
           </details>
-        </td>
-        <td>
-          <details>
-            <summary>Edit</summary>
-            <form method="post" action="/admin/links/${item.id}" class="edit-form">
-              <input type="hidden" name="_method" value="patch" />
+        </div>
+
+        <details class="link-card__edit">
+          <summary>Edit</summary>
+          <form method="post" action="/admin/links/${item.id}" class="edit-form">
+            <input type="hidden" name="_method" value="patch" />
+            <div class="grid">
               <label>Slug
                 <input name="slug" value="${escapeHtml(item.slug)}" />
               </label>
@@ -260,7 +271,7 @@ export function createApp(config: AppConfig, links: LinkService) {
                   ${['active', 'disabled', 'archived'].map((status) => `<option value="${status}"${status === item.status ? ' selected' : ''}>${status}</option>`).join('')}
                 </select>
               </label>
-              <label>Expiry
+              <label class="field--full">Expiry
                 <input type="datetime-local" name="expiresAt" value="${formatDateTimeLocal(item.expiresAt)}" />
               </label>
               <label>Title
@@ -272,11 +283,11 @@ export function createApp(config: AppConfig, links: LinkService) {
               <label>Created by
                 <input name="createdBy" value="${escapeHtml(item.createdBy ?? '')}" />
               </label>
-              <button type="submit">Save</button>
-            </form>
-          </details>
-        </td>
-      </tr>
+            </div>
+            <button type="submit">Save</button>
+          </form>
+        </details>
+      </article>
       `;
     }).join('');
 
@@ -287,148 +298,439 @@ export function createApp(config: AppConfig, links: LinkService) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Link Shortener Admin</title>
         <style>
-          body { font-family: system-ui, sans-serif; margin: 0; background: #0b0f14; color: #e8eef6; }
-          main { max-width: 1200px; margin: 0 auto; padding: 32px 20px 60px; }
-          h1, h2 { margin: 0 0 16px; }
-          .panel { background: #111823; border: 1px solid #243042; border-radius: 16px; padding: 20px; margin-bottom: 20px; }
-          form { display: grid; gap: 12px; }
-          .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-          label { display: grid; gap: 6px; font-size: 14px; color: #b6c1cf; }
-          input, select { background: #0d141d; color: #e8eef6; border: 1px solid #2b3950; border-radius: 10px; padding: 10px 12px; }
-          button { background: #7dd3fc; color: #081018; border: 0; border-radius: 10px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { padding: 10px 8px; border-bottom: 1px solid #243042; text-align: left; vertical-align: top; }
-          th { color: #8ea1b6; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+          :root {
+            color-scheme: light;
+            --bg: #f3eee5;
+            --bg-soft: #efe7db;
+            --panel: rgba(255, 255, 255, 0.82);
+            --panel-strong: #ffffff;
+            --panel-border: rgba(89, 76, 58, 0.12);
+            --text: #26201b;
+            --muted: #7c7266;
+            --accent: #3b82f6;
+            --accent-strong: #2563eb;
+            --accent-soft: rgba(59, 130, 246, 0.12);
+            --shadow: 0 20px 60px rgba(78, 64, 47, 0.12);
+            --shadow-soft: 0 10px 30px rgba(78, 64, 47, 0.08);
+          }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+              radial-gradient(circle at top left, rgba(255, 255, 255, 0.75), transparent 38%),
+              radial-gradient(circle at top right, rgba(188, 210, 255, 0.42), transparent 26%),
+              linear-gradient(180deg, #f7f1e8 0%, var(--bg) 45%, #f0e8dc 100%);
+          }
+          body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+              linear-gradient(rgba(69, 54, 36, 0.02) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(69, 54, 36, 0.02) 1px, transparent 1px);
+            background-size: 28px 28px;
+            mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 80%);
+          }
+          main {
+            max-width: 1360px;
+            margin: 0 auto;
+            padding: 28px 20px 64px;
+            position: relative;
+            z-index: 1;
+          }
+          h1, h2, h3, p { margin: 0; }
+          a { color: var(--accent-strong); text-decoration: none; }
+          a:hover { text-decoration: underline; }
+          .hero {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 26px 28px;
+            margin-bottom: 20px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.68));
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+          }
+          .hero-copy { max-width: 760px; display: grid; gap: 10px; }
+          .eyebrow {
+            text-transform: uppercase;
+            letter-spacing: .18em;
+            font-size: 11px;
+            color: var(--muted);
+          }
+          .hero h1 {
+            font-size: clamp(2.1rem, 4vw, 3.4rem);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
+          }
+          .hero-copy p:last-child {
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.5;
+            max-width: 62ch;
+          }
+          .hero-meta {
+            display: grid;
+            gap: 10px;
+            min-width: 260px;
+          }
+          .hero-chip {
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 14px 16px;
+            box-shadow: var(--shadow-soft);
+            display: grid;
+            gap: 4px;
+          }
+          .hero-chip span {
+            text-transform: uppercase;
+            letter-spacing: .16em;
+            font-size: 10px;
+            color: var(--muted);
+          }
+          .hero-chip strong {
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.3;
+            word-break: break-word;
+          }
+          .hero-chip.subtle {
+            background: rgba(59, 130, 246, 0.08);
+          }
+          .dashboard-grid {
+            display: grid;
+            grid-template-columns: minmax(310px, 390px) minmax(0, 1fr);
+            gap: 20px;
+            align-items: start;
+          }
+          .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(12px);
+          }
+          .panel h2 {
+            font-size: 18px;
+            letter-spacing: -0.03em;
+            margin-bottom: 14px;
+          }
+          .panel-compact { position: sticky; top: 20px; }
+          form { display: grid; gap: 14px; }
+          .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }
+          .field--full {
+            grid-column: 1 / -1;
+          }
+          label {
+            display: grid;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 600;
+          }
+          input, select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            color: var(--text);
+            border: 1px solid rgba(89, 76, 58, 0.14);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font: inherit;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+          }
+          input::placeholder { color: #a29688; }
+          input:focus, select:focus, button:focus, summary:focus {
+            outline: 3px solid rgba(59, 130, 246, 0.18);
+            outline-offset: 2px;
+          }
+          button {
+            background: linear-gradient(180deg, #60a5fa, var(--accent-strong));
+            color: #fff;
+            border: 0;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 14px 24px rgba(37, 99, 235, 0.24);
+            transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+          }
+          button:hover {
+            transform: translateY(-1px);
+            filter: saturate(1.05);
+            box-shadow: 0 18px 30px rgba(37, 99, 235, 0.28);
+          }
+          .panel-table { min-width: 0; }
+          .link-list {
+            display: grid;
+            gap: 14px;
+          }
+          .link-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 240, 231, 0.9));
+            border: 1px solid rgba(89, 76, 58, 0.12);
+            border-radius: 22px;
+            padding: 18px;
+            box-shadow: var(--shadow-soft);
+            display: grid;
+            gap: 18px;
+          }
+          .link-card__top {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: flex-start;
+          }
+          .link-card__identity {
+            min-width: 0;
+            display: grid;
+            gap: 10px;
+          }
+          .link-card__slug-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+          }
+          .link-card__slug-row strong {
+            font-size: 18px;
+            letter-spacing: -0.03em;
+          }
+          .link-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--accent-strong);
+          }
+          .link-badge-soft {
+            background: rgba(89, 76, 58, 0.08);
+            color: var(--muted);
+          }
+          .link-card__meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 14px;
+            word-break: break-word;
+          }
+          .link-card__meta a {
+            font-weight: 700;
+          }
+          .link-card__submeta {
+            font-size: 12px;
+          }
+          .link-card__updated {
+            font-size: 13px;
+            text-align: right;
+            white-space: nowrap;
+          }
+          .link-card__stats {
+            display: grid;
+            gap: 12px;
+          }
+          .link-card__edit {
+            background: rgba(255, 255, 255, 0.55);
+            border: 1px solid rgba(89, 76, 58, 0.08);
+            border-radius: 18px;
+            padding: 14px;
+          }
+          .link-card__edit summary {
+            margin-bottom: 0;
+          }
+          .link-card__edit[open] summary {
+            margin-bottom: 12px;
+          }
           .inline-form { display: flex; gap: 8px; align-items: center; }
           .inline-form select, .inline-form button { padding: 8px 10px; }
-          details { max-width: 420px; }
-          summary { cursor: pointer; color: #7dd3fc; font-weight: 700; margin-bottom: 10px; }
-          .edit-form { margin-top: 10px; display: grid; gap: 10px; }
-          a { color: #7dd3fc; }
-          .muted { color: #8ea1b6; }
-          .stats-cell { min-width: 360px; }
+          details {
+            max-width: 100%;
+          }
+          summary {
+            cursor: pointer;
+            color: var(--accent-strong);
+            font-weight: 700;
+            margin-bottom: 10px;
+            list-style: none;
+          }
+          summary::-webkit-details-marker { display: none; }
+          .edit-form {
+            margin-top: 10px;
+            display: grid;
+            gap: 10px;
+          }
+          .muted { color: var(--muted); }
           .stats-summary {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
             gap: 10px;
           }
           .stats-summary-empty { opacity: 0.9; }
           .stats-metric {
-            background: #0d141d;
-            border: 1px solid #243042;
-            border-radius: 12px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(249, 244, 235, 0.9));
+            border: 1px solid rgba(89, 76, 58, 0.12);
+            border-radius: 16px;
             padding: 10px 12px;
             display: grid;
             gap: 4px;
           }
           .stats-metric span {
-            color: #8ea1b6;
+            color: var(--muted);
             font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: .08em;
+            letter-spacing: .12em;
           }
           .stats-metric strong {
-            color: #e8eef6;
+            color: var(--text);
             font-size: 13px;
             line-height: 1.2;
             word-break: break-word;
           }
           .stats-metric small {
-            color: #8ea1b6;
+            color: var(--muted);
             font-size: 11px;
           }
           .stats-note { margin-top: 10px; }
-          .stats-details { margin-top: 14px; max-width: 100%; }
+          .stats-details { margin-top: 4px; max-width: 100%; }
           .stats-details summary { margin-bottom: 12px; }
-          .stats-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+          .stats-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
           .chart-panel, .referrer-panel {
-            background: #0d141d;
-            border: 1px solid #243042;
-            border-radius: 14px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(245, 239, 229, 0.95));
+            border: 1px solid rgba(89, 76, 58, 0.12);
+            border-radius: 18px;
             padding: 12px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
           }
           .chart-panel h3, .referrer-panel h3 {
             margin: 0 0 10px;
             font-size: 13px;
             text-transform: uppercase;
-            letter-spacing: .08em;
-            color: #8ea1b6;
+            letter-spacing: .12em;
+            color: var(--muted);
           }
           .chart-shell { display: grid; gap: 8px; }
-          .chart-caption { display: flex; justify-content: space-between; gap: 12px; color: #8ea1b6; font-size: 12px; }
+          .chart-caption { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
           .chart-svg { width: 100%; height: auto; overflow: visible; }
-          .chart-axis { fill: #8ea1b6; font-size: 10px; }
-          .chart-bar { fill: #7dd3fc; }
-          .chart-bar-empty { fill: #243042; }
+          .chart-axis { fill: var(--muted); font-size: 10px; }
+          .chart-axis--dim { opacity: 0.45; }
+          .chart-bar { fill: var(--accent); }
+          .chart-bar-empty { fill: rgba(89, 76, 58, 0.12); }
           .referrer-list { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
           .referrer-list li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
           .referrer-main { display: grid; gap: 2px; min-width: 0; }
-          .referrer-list code { color: #e8eef6; font-size: 13px; }
-          .referrer-list small { color: #8ea1b6; font-size: 11px; }
-          .referrer-list strong { color: #7dd3fc; }
+          .referrer-list code { color: var(--text); font-size: 13px; }
+          .referrer-list small { color: var(--muted); font-size: 11px; }
+          .referrer-list strong { color: var(--accent-strong); }
+          .footer-note {
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+          }
+          .empty-state {
+            padding: 28px;
+            text-align: center;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.65);
+            border: 1px dashed rgba(89, 76, 58, 0.18);
+            border-radius: 18px;
+          }
           @media (max-width: 900px) {
-            .stats-cell { min-width: 280px; }
+            .hero { flex-direction: column; align-items: stretch; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .panel-compact { position: static; }
+            .grid { grid-template-columns: 1fr; }
+            .field--full { grid-column: 1 / -1; }
+            .link-card__top { flex-direction: column; }
+            .link-card__updated { text-align: left; white-space: normal; }
+          }
+          @media (max-width: 640px) {
+            main { padding-inline: 14px; }
+            .hero, .panel { padding: 18px; border-radius: 20px; }
+            .hero h1 { font-size: 2rem; }
           }
         </style>
       </head>
       <body>
         <main>
-          <h1>Link Shortener Admin</h1>
-          <p class="muted">Base URL: ${escapeHtml(getBaseUrl(config))}</p>
-
-          <section class="panel">
-            <h2>Create link</h2>
-            <form method="post" action="/admin/links">
-              <div class="grid">
-                <label>Slug
-                  <input name="slug" placeholder="summer-camp" required />
-                </label>
-                <label>Destination URL
-                  <input name="destinationUrl" placeholder="https://example.com" required />
-                </label>
-                <label>Redirect status code
-                  <select name="redirectStatusCode">
-                    ${options}
-                  </select>
-                </label>
-                <label>Status
-                  <select name="status">
-                    <option value="active" selected>active</option>
-                    <option value="disabled">disabled</option>
-                    <option value="archived">archived</option>
-                  </select>
-                </label>
-                <label>Title
-                  <input name="title" placeholder="Campaign name" />
-                </label>
-                <label>Expiry
-                  <input type="datetime-local" name="expiresAt" />
-                </label>
+          <header class="hero">
+            <div class="hero-copy">
+              <p class="eyebrow">Control room</p>
+              <h1>Link Shortener Admin</h1>
+              <p>Manage redirects, inspect click patterns by day and hour, and keep an eye on referrers from a cleaner, calmer dashboard.</p>
+            </div>
+            <div class="hero-meta">
+              <div class="hero-chip">
+                <span>Base URL</span>
+                <strong>${escapeHtml(getBaseUrl(config))}</strong>
               </div>
-              <label>Description
-                <input name="description" placeholder="Optional notes" />
-              </label>
-              <button type="submit">Create link</button>
-            </form>
-          </section>
+              <div class="hero-chip subtle">
+                <span>Access</span>
+                <strong>Admin token required</strong>
+              </div>
+            </div>
+          </header>
 
-          <section class="panel">
-            <h2>Existing links</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Slug</th>
-                  <th>Short URL</th>
-                  <th>Destination</th>
-                  <th>Code</th>
-                  <th>Status</th>
-                  <th>Stats</th>
-                  <th>Update</th>
-                </tr>
-              </thead>
-              <tbody>${rows || '<tr><td colspan="7" class="muted">No links yet.</td></tr>'}</tbody>
-            </table>
-          </section>
+          <div class="dashboard-grid">
+            <section class="panel panel-compact">
+              <h2>Create link</h2>
+              <form method="post" action="/admin/links">
+                <div class="grid">
+                  <label>Slug
+                    <input name="slug" placeholder="summer-camp" required />
+                  </label>
+                  <label>Destination URL
+                    <input name="destinationUrl" placeholder="https://example.com" required />
+                  </label>
+                  <label>Redirect status code
+                    <select name="redirectStatusCode">
+                      ${options}
+                    </select>
+                  </label>
+                  <label>Status
+                    <select name="status">
+                      <option value="active" selected>active</option>
+                      <option value="disabled">disabled</option>
+                      <option value="archived">archived</option>
+                    </select>
+                  </label>
+                  <label>Title
+                    <input name="title" placeholder="Campaign name" />
+                  </label>
+                  <label class="field--full">Expiry
+                    <input type="datetime-local" name="expiresAt" />
+                  </label>
+                </div>
+                <label>Description
+                  <input name="description" placeholder="Optional notes" />
+                </label>
+                <button type="submit">Create link</button>
+              </form>
+            </section>
+
+            <section class="panel panel-table">
+              <h2>Existing links</h2>
+              <div class="link-list">${cards || '<div class="empty-state">No links yet.</div>'}</div>
+            </section>
+          </div>
+
+          <p class="footer-note">Stats are shown in UTC to keep the distribution honest across time zones.</p>
         </main>
       </body>
     </html>`;
@@ -782,18 +1084,20 @@ function renderHistogram(points: Array<{ label: string; count: number }>, width:
   const maxValue = Math.max(...points.map((point) => point.count), 1);
   const paddingTop = 12;
   const paddingRight = 10;
-  const paddingBottom = 28;
+  const paddingBottom = 34;
   const paddingLeft = 10;
   const plotWidth = width - paddingLeft - paddingRight;
   const plotHeight = height - paddingTop - paddingBottom;
   const barWidth = plotWidth / Math.max(points.length, 1);
+  const maxLabels = Math.max(4, Math.floor(width / 60));
+  const labelStep = Math.max(1, Math.ceil(points.length / maxLabels));
 
   const bars = points.map((point, index) => {
     const barHeight = point.count === 0 ? 0 : Math.max(4, (point.count / maxValue) * plotHeight);
     const x = paddingLeft + (index * barWidth) + 2;
     const y = paddingTop + plotHeight - barHeight;
     const labelX = x + (barWidth - 4) / 2;
-    const showLabel = points.length <= 14 || index % Math.max(1, Math.ceil(points.length / 7)) === 0;
+    const showLabel = index === 0 || index === points.length - 1 || index % labelStep === 0;
     return `
       <g>
         <title>${escapeHtml(`${point.label}: ${point.count} clicks`)}</title>
