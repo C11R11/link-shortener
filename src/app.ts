@@ -90,7 +90,20 @@ export function createApp(config: AppConfig, links: LinkService) {
     if (config.SHORTENER_SCHEME === 'http') {
       await app.register(helmet, { contentSecurityPolicy: false });
     } else {
-      await app.register(helmet);
+      await app.register(helmet, {
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:', 'https:'],
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+          },
+        },
+      });
     }
   };
 

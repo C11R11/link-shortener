@@ -36,6 +36,14 @@ async function main() {
     { slug: 'old-campaign', destinationUrl: 'https://example.com/old', title: 'Old campaign', status: 'archived' as const },
   ];
 
+  console.log('Cleaning existing seed data...');
+  const existing = await db.select({ id: links.id }).from(links).where(inArray(links.slug, seedLinks.map((l) => l.slug)));
+  if (existing.length > 0) {
+    const ids = existing.map((l) => l.id);
+    await db.delete(linkClicks).where(inArray(linkClicks.linkId, ids));
+    await db.delete(links).where(inArray(links.id, ids));
+  }
+
   console.log('Seeding links...');
   const created = await db.insert(links).values(seedLinks).returning();
 
@@ -59,7 +67,7 @@ async function main() {
   process.exit(0);
 }
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 main().catch((err) => {
   console.error(err);
