@@ -1,3 +1,4 @@
+# Dev-only credentials. Use environment variables or a secrets manager in production.
 services:
   db:
     image: postgres:16-alpine
