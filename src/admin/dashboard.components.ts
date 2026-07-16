@@ -176,48 +176,58 @@ export function renderLinkDetail(stats: LinkStats, config: AppConfig): string {
 
 export function dashboardClientScripts(): string {
   return `(() => {
-    const html = document.documentElement;
-    const stored = localStorage.getItem('dashboard-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = stored || (prefersDark ? 'dark' : 'light');
-    html.setAttribute('data-theme', theme);
+    function initDashboard() {
+      const html = document.documentElement;
+      const stored = localStorage.getItem('dashboard-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = stored || (prefersDark ? 'dark' : 'light');
+      html.setAttribute('data-theme', theme);
 
-    document.querySelectorAll('[data-dash-action="theme"]').forEach((btn) => {
-      btn.textContent = theme === 'dark' ? '\u{1F319}' : '\u{2600}\u{FE0F}';
-      btn.addEventListener('click', () => {
-        const current = html.getAttribute('data-theme') || 'dark';
-        const next = current === 'dark' ? 'light' : 'dark';
-        html.setAttribute('data-theme', next);
-        localStorage.setItem('dashboard-theme', next);
-        btn.textContent = next === 'dark' ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+      document.querySelectorAll('[data-dash-action="theme"]').forEach((btn) => {
+        btn.textContent = theme === 'dark' ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+        btn.addEventListener('click', () => {
+          const current = html.getAttribute('data-theme') || 'dark';
+          const next = current === 'dark' ? 'light' : 'dark';
+          html.setAttribute('data-theme', next);
+          localStorage.setItem('dashboard-theme', next);
+          document.querySelectorAll('[data-dash-action="theme"]').forEach((b) => {
+            b.textContent = next === 'dark' ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+          });
+        });
       });
-    });
 
-    document.querySelectorAll('[data-dash-action="refresh"]').forEach((btn) => {
-      btn.addEventListener('click', () => window.location.reload());
-    });
+      document.querySelectorAll('[data-dash-action="refresh"]').forEach((btn) => {
+        btn.addEventListener('click', () => window.location.reload());
+      });
 
-    function initChart(canvas, labels, values, label) {
-      const Chart = window.Chart;
-      if (!canvas || !Chart) return;
-      new Chart(canvas.getContext('2d'), {
-        type: 'line',
-        data: { labels, datasets: [{ label, data: values, borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', fill: true, tension: 0.3 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888' }, grid: { color: '#222' } }, y: { ticks: { color: '#888' }, grid: { color: '#222' }, beginAtZero: true } } }
+      function initChart(canvas, labels, values, label) {
+        const Chart = window.Chart;
+        if (!canvas || !Chart) return;
+        new Chart(canvas.getContext('2d'), {
+          type: 'line',
+          data: { labels, datasets: [{ label, data: values, borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', fill: true, tension: 0.3 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888' }, grid: { color: '#222' } }, y: { ticks: { color: '#888' }, grid: { color: '#222' }, beginAtZero: true } } }
+        });
+      }
+
+      const mainChart = document.getElementById('clicks-chart');
+      if (mainChart) {
+        const section = mainChart.closest('.dash__section');
+        const data = section && section.dataset.chart ? JSON.parse(section.dataset.chart) : { labels: [], values: [] };
+        initChart(mainChart, data.labels, data.values, 'Clicks');
+      }
+
+      document.querySelectorAll('.detail-chart').forEach((canvas) => {
+        const labels = JSON.parse(canvas.dataset.labels || '[]');
+        const values = JSON.parse(canvas.dataset.values || '[]');
+        initChart(canvas, labels, values, canvas.dataset.type === 'day' ? 'By day' : 'By hour');
       });
     }
 
-    const mainChart = document.getElementById('clicks-chart');
-    if (mainChart) {
-      const section = mainChart.closest('.dash__section');
-      const data = section && section.dataset.chart ? JSON.parse(section.dataset.chart) : { labels: [], values: [] };
-      initChart(mainChart, data.labels, data.values, 'Clicks');
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initDashboard);
+    } else {
+      initDashboard();
     }
-
-    document.querySelectorAll('.detail-chart').forEach((canvas) => {
-      const labels = JSON.parse(canvas.dataset.labels || '[]');
-      const values = JSON.parse(canvas.dataset.values || '[]');
-      initChart(canvas, labels, values, canvas.dataset.type === 'day' ? 'By day' : 'By hour');
-    });
   })();`;
 }
