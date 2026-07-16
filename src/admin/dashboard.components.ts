@@ -82,7 +82,7 @@ function renderChartSectionBase(period: StatsPeriod, chartData: Array<{ bucket: 
 }
 
 export function renderStatsContainer(stats: GlobalStats, period: StatsPeriod): string {
-  return `<div id="stats-container" hx-get="/admin/dashboard/stats?period=${period}" hx-trigger="load" hx-target="this" hx-swap="outerHTML">
+  return `<div id="stats-container">
     ${renderKpiSection(stats)}
     ${renderChartSectionBase(period, stats.chartData)}
   </div>`;
