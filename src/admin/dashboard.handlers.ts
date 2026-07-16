@@ -11,7 +11,6 @@ import {
   renderCreateForm,
   renderLinksTable,
   renderLinkDetail,
-  dashboardClientScripts,
 } from './dashboard.components.js';
 
 export type AuthGuard = (request: { headers: Record<string, unknown> }) => void;
@@ -31,8 +30,7 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
       ${renderChartSection(period)}
       ${renderCreateForm()}
       ${renderLinksTable(config, items, statsById)}
-    </div>
-    ${dashboardClientScripts()}`;
+    </div>`;
 
     return reply.type('text/html').send(layoutShell(config, body));
   });
