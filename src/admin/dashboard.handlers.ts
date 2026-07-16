@@ -14,10 +14,13 @@ import {
   dashboardClientScripts,
 } from './dashboard.components.js';
 
-export function registerDashboard(app: FastifyInstance, config: AppConfig, links: LinkService) {
+export type AuthGuard = (request: { headers: Record<string, unknown> }) => void;
+
+export function registerDashboard(app: FastifyInstance, config: AppConfig, links: LinkService, requireAdmin: AuthGuard) {
   const statsService = createStatsService(links);
 
   app.get('/admin/dashboard', async (request, reply) => {
+    requireAdmin(request);
     const items = await links.listLinks();
     const statsById = new Map(await Promise.all(items.map(async (item) => [item.id, await links.getLinkStats(item.id)] as const)));
     const period: StatsPeriod = '7d';
@@ -35,12 +38,14 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
   });
 
   app.get('/admin/dashboard/stats', async (request, reply) => {
+    requireAdmin(request);
     const period = normalizePeriod((request.query as { period?: string }).period);
     const stats = await statsService.getGlobalStats(period);
     return reply.type('text/html').send(renderStatsFragment(stats, period));
   });
 
   app.get('/admin/dashboard/links/:id/detail', async (request, reply) => {
+    requireAdmin(request);
     const { id } = request.params as { id: string };
     const stats = await links.getLinkStats(id);
     if (!stats) return reply.code(404).send('Not found');

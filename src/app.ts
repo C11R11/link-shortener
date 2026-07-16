@@ -108,7 +108,7 @@ export function createApp(config: AppConfig, links: LinkService) {
       prefix: '/admin/',
       serveDotFiles: false,
     });
-    registerDashboard(app, config, links);
+    registerDashboard(app, config, links, requireAdmin);
   };
 
   const isAuthorized = (request: { headers: Record<string, unknown> }) => {
