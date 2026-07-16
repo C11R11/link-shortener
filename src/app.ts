@@ -394,9 +394,12 @@ export function createApp(config: AppConfig, links: LinkService) {
       reply.header('WWW-Authenticate', 'Basic realm="Link Shortener Admin"');
     }
 
-    reply.code(statusCode).send({
-      error: statusCode === 500 ? 'Internal Server Error' : (typedError.message ?? 'Error'),
-    });
+    const isProduction = process.env.NODE_ENV === 'production';
+    const message = statusCode >= 500 || isProduction
+      ? genericMessageForStatus(statusCode)
+      : (typedError.message ?? 'Error');
+
+    reply.code(statusCode).send({ error: message });
   });
 
   return {
@@ -421,4 +424,19 @@ function parseDateTimeLocal(value: string | null | undefined): Date | null {
 
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function genericMessageForStatus(statusCode: number): string {
+  if (statusCode >= 500) return 'Internal Server Error';
+  if (statusCode === 400) return 'Bad Request';
+  if (statusCode === 401) return 'Unauthorized';
+  if (statusCode === 403) return 'Forbidden';
+  if (statusCode === 404) return 'Not Found';
+  if (statusCode === 409) return 'Conflict';
+  if (statusCode === 410) return 'Gone';
+  if (statusCode === 413) return 'Payload Too Large';
+  if (statusCode === 415) return 'Unsupported Media Type';
+  if (statusCode === 422) return 'Unprocessable Entity';
+  if (statusCode === 429) return 'Too Many Requests';
+  return 'Error';
 }

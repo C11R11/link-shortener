@@ -1,0 +1,234 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createApp, type LinkService, type LinkRecord, type LinkStats } from '../src/app.js';
+import type { AppConfig } from '../src/config.js';
+
+const baseConfig: AppConfig = {
+  APP_PORT: 3000,
+  SHORTENER_DOMAIN: 'test.local',
+  SHORTENER_SCHEME: 'http',
+  DATABASE_URL: 'postgres://shortener:shortener@db:5432/shortener',
+  ADMIN_TOKEN: 'change-me',
+  REDIRECT_STATUS_CODE: 302,
+};
+
+function makeLink(overrides: Partial<LinkRecord> = {}): LinkRecord {
+  return {
+    id: 'link-1',
+    slug: 'demo',
+    destinationUrl: 'https://example.com',
+    redirectStatusCode: 302,
+    title: null,
+    description: null,
+    status: 'active',
+    clickCount: 0,
+    lastClickedAt: null,
+    createdBy: null,
+    expiresAt: null,
+    deletedAt: null,
+    createdAt: new Date('2026-07-13T00:00:00Z'),
+    updatedAt: new Date('2026-07-13T00:00:00Z'),
+    ...overrides,
+  };
+}
+
+function makeServiceThatThrows(message: string): LinkService {
+  return {
+    async listLinks() {
+      throw Object.assign(new Error(message), { statusCode: 500 });
+    },
+    async getLinkBySlug() {
+      return null;
+    },
+    async getLinkById() {
+      return null;
+    },
+    async createLink() {
+      return makeLink();
+    },
+    async updateLink() {
+      return null;
+    },
+    async disableLink() {
+      return null;
+    },
+    async recordClick() {},
+    async getLinkStats() {
+      return null;
+    },
+  };
+}
+
+function makeServiceForStats(): LinkService {
+  return {
+    async listLinks() {
+      return [];
+    },
+    async getLinkBySlug() {
+      return null;
+    },
+    async getLinkById() {
+      return null;
+    },
+    async createLink() {
+      return makeLink();
+    },
+    async updateLink() {
+      return null;
+    },
+    async disableLink() {
+      return null;
+    },
+    async recordClick() {},
+    async getLinkStats() {
+      throw Object.assign(new Error('connection refused: postgres://user:secret@db:5432/shortener at port 5432'), { statusCode: 500 });
+    },
+  };
+}
+
+async function buildApp(service: LinkService) {
+  const { app, ready } = createApp(baseConfig, service);
+  await ready();
+  return app;
+}
+
+test('error handler in development passes through 4xx error.message', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  delete process.env.NODE_ENV;
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  // Service throws a 400 with an internal-looking message.
+  const service: LinkService = makeServiceForStats();
+  service.listLinks = async () => {
+    throw Object.assign(new Error('internal pg detail: relation "links" does not exist'), { statusCode: 400 });
+  };
+
+  const app = await buildApp(service);
+  const response = await app.inject({ method: 'GET', url: '/api/links' });
+
+  assert.equal(response.statusCode, 400);
+  // In dev (NODE_ENV not 'production'), the raw error message is included
+  // for debugging.
+  const body = response.json();
+  assert.match(body.error, /internal pg detail/);
+});
+
+test('error handler in production returns generic messages for 5xx', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  const app = await buildApp(makeServiceForStats());
+  const response = await app.inject({
+    method: 'GET',
+    url: '/api/links/link-1/stats',
+    headers: { authorization: 'Bearer change-me' },
+  });
+
+  assert.equal(response.statusCode, 500);
+  const body = response.json();
+  // Generic message must not leak the underlying error text.
+  assert.equal(body.error, 'Internal Server Error');
+  assert.doesNotMatch(body.error, /connection refused/);
+  assert.doesNotMatch(body.error, /postgres/);
+  assert.doesNotMatch(body.error, /secret/);
+});
+
+test('error handler in production returns generic messages for 401', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  const app = await buildApp(makeServiceForStats());
+  const response = await app.inject({
+    method: 'GET',
+    url: '/admin/dashboard',
+  });
+
+  assert.equal(response.statusCode, 401);
+  const body = response.json();
+  // requireAdmin throws Error('Unauthorized') with statusCode 401.
+  // In production we still want a generic message — even though both
+  // strings happen to match here, the contract is generic-only.
+  assert.equal(body.error, 'Unauthorized');
+  // 401 should still set WWW-Authenticate so clients can prompt for credentials.
+  assert.equal(response.headers['www-authenticate'], 'Basic realm="Link Shortener Admin"');
+});
+
+test('error handler in production does not leak 4xx error.message from downstream', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  // Service that throws a 400 with an internal-looking message.
+  const service: LinkService = {
+    ...makeServiceThatThrows('internal pg detail: relation "links" does not exist at offset 42'),
+  };
+  // Override listLinks to throw a 400 instead.
+  service.listLinks = async () => {
+    throw Object.assign(new Error('internal pg detail: relation "links" does not exist at offset 42'), { statusCode: 400 });
+  };
+
+  const app = await buildApp(service);
+  // GET /api/links does not require auth and triggers listLinks().
+  const response = await app.inject({ method: 'GET', url: '/api/links' });
+
+  assert.equal(response.statusCode, 400);
+  const body = response.json();
+  assert.equal(body.error, 'Bad Request');
+  assert.doesNotMatch(body.error, /pg/);
+  assert.doesNotMatch(body.error, /links/);
+});
+
+test('error handler in production returns 404 generic message for unknown route', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  const app = await buildApp(makeServiceForStats());
+  // Multi-segment path so it does not match the wildcard /:slug route.
+  const response = await app.inject({ method: 'GET', url: '/multi/segment/path' });
+
+  assert.equal(response.statusCode, 404);
+  const body = response.json();
+  assert.equal(body.error, 'Not Found');
+});
+
+test('error handler preserves statusCode from thrown error in production', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  const service: LinkService = makeServiceForStats();
+  service.listLinks = async () => {
+    throw Object.assign(new Error('not allowed'), { statusCode: 403 });
+  };
+
+  const app = await buildApp(service);
+  const response = await app.inject({ method: 'GET', url: '/api/links' });
+
+  // The statusCode from the error must be preserved even though the
+  // message is replaced with a generic one.
+  assert.equal(response.statusCode, 403);
+  const body = response.json();
+  assert.equal(body.error, 'Forbidden');
+  assert.doesNotMatch(body.error, /not allowed/);
+});
