@@ -97,7 +97,7 @@ export function createApp(config: AppConfig, links: LinkService) {
             scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
             styleSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", 'data:', 'https:'],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", 'https://cdn.jsdelivr.net'],
             fontSrc: ["'self'"],
             objectSrc: ["'none'"],
             upgradeInsecureRequests: [],
