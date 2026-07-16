@@ -65,9 +65,11 @@ function renderKpi(label: string, value: string): string {
   </div>`;
 }
 
-function renderChartSectionBase(period: StatsPeriod, hxLoad: boolean): string {
+function renderChartSectionBase(period: StatsPeriod, hxLoad: boolean, chartData: Array<{ bucket: string; count: number }>): string {
   const loadTrigger = hxLoad ? ` hx-trigger="load" hx-get="/admin/dashboard/stats?period=${period}" hx-target="this" hx-swap="outerHTML"` : '';
-  return `<section class="dash__section" id="chart-section"${loadTrigger}>
+  const labels = escapeHtml(JSON.stringify(chartData.map((d) => d.bucket)));
+  const values = escapeHtml(JSON.stringify(chartData.map((d) => d.count)));
+  return `<section class="dash__section" id="chart-section" data-chart='${labels}' data-values='${values}'${loadTrigger}>
     <div class="dash__section-header">
       <h2 class="dash__section-title">$ clicks --time-series</h2>
       <div class="dash__toolbar">
@@ -80,16 +82,16 @@ function renderChartSectionBase(period: StatsPeriod, hxLoad: boolean): string {
   </section>`;
 }
 
-export function renderChartSection(period: StatsPeriod): string {
-  return renderChartSectionBase(period, true);
+export function renderChartSection(period: StatsPeriod, chartData: Array<{ bucket: string; count: number }>): string {
+  return renderChartSectionBase(period, true, chartData);
 }
 
-export function renderChartSectionHx(period: StatsPeriod): string {
-  return renderChartSectionBase(period, false);
+export function renderChartSectionHx(period: StatsPeriod, chartData: Array<{ bucket: string; count: number }>): string {
+  return renderChartSectionBase(period, false, chartData);
 }
 
 export function renderStatsFragment(stats: GlobalStats, period: StatsPeriod): string {
-  return `${renderKpiSection(stats)}${renderChartSectionHx(period)}`;
+  return `${renderKpiSection(stats)}${renderChartSectionHx(period, stats.chartData)}`;
 }
 
 export function renderCreateForm(): string {
@@ -222,8 +224,9 @@ export function dashboardClientScripts(): string {
       const mainChart = document.getElementById('clicks-chart');
       if (mainChart) {
         const section = mainChart.closest('.dash__section');
-        const data = section && section.dataset.chart ? JSON.parse(section.dataset.chart) : { labels: [], values: [] };
-        initChart(mainChart, data.labels, data.values, 'Clicks');
+        const labels = section && section.dataset.chart ? JSON.parse(section.dataset.chart) : [];
+        const values = section && section.dataset.values ? JSON.parse(section.dataset.values) : [];
+        initChart(mainChart, labels, values, 'Clicks');
       }
 
       document.querySelectorAll('.detail-chart').forEach((canvas) => {
