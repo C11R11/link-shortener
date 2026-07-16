@@ -32,6 +32,22 @@ npm run migrate
 npm run seed   # optional: only for local development
 ```
 
+> **Note for local development without Docker:** `docker compose` injects
+> the required environment variables into every container automatically,
+> so commands run inside Docker (e.g. `docker compose run --rm app npm run
+> migrate`) pick them up without extra setup. Bare `npm run` scripts invoked
+> on the host — such as `npm run migrate`, `npm run seed`, `npm test`, or
+> `npm run dev` — read from the current shell instead, so make sure you
+> have a local `.env` first:
+>
+> ```bash
+> cp .env.example .env
+> # edit .env with your values
+> ```
+>
+> Without it, the app will refuse to start (Zod fails fast on a missing
+> `DATABASE_URL` / `ADMIN_TOKEN` / `SHORTENER_DOMAIN`).
+
 Open the dashboard at `http://localhost:3000/admin/dashboard` and authenticate with `Authorization: Bearer <ADMIN_TOKEN>`.
 
 ## Environment Variables
