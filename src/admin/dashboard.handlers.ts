@@ -7,7 +7,7 @@ import {
   renderHeader,
   renderKpiSection,
   renderChartSection,
-  renderStatsFragment,
+  renderChartSectionHx,
   renderCreateForm,
   renderLinksTable,
   renderLinkDetail,
@@ -38,8 +38,7 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
   app.get('/admin/dashboard/stats', async (request, reply) => {
     requireAdmin(request);
     const period = normalizePeriod((request.query as { period?: string }).period);
-    const stats = await statsService.getGlobalStats(period);
-    return reply.type('text/html').send(renderStatsFragment(stats, period));
+    return reply.type('text/html').send(renderChartSectionHx(period));
   });
 
   app.get('/admin/dashboard/links/:id/detail', async (request, reply) => {

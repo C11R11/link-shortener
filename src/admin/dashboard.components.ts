@@ -65,8 +65,9 @@ function renderKpi(label: string, value: string): string {
   </div>`;
 }
 
-export function renderChartSection(period: StatsPeriod): string {
-  return `<section class="dash__section" id="chart-section" hx-get="/admin/dashboard/stats?period=${period}" hx-trigger="load" hx-target="this" hx-swap="outerHTML">
+function renderChartSectionBase(period: StatsPeriod, hxLoad: boolean): string {
+  const loadTrigger = hxLoad ? ` hx-trigger="load" hx-get="/admin/dashboard/stats?period=${period}" hx-target="this" hx-swap="outerHTML"` : '';
+  return `<section class="dash__section" id="chart-section"${loadTrigger}>
     <div class="dash__section-header">
       <h2 class="dash__section-title">$ clicks --time-series</h2>
       <div class="dash__toolbar">
@@ -79,8 +80,16 @@ export function renderChartSection(period: StatsPeriod): string {
   </section>`;
 }
 
+export function renderChartSection(period: StatsPeriod): string {
+  return renderChartSectionBase(period, true);
+}
+
+export function renderChartSectionHx(period: StatsPeriod): string {
+  return renderChartSectionBase(period, false);
+}
+
 export function renderStatsFragment(stats: GlobalStats, period: StatsPeriod): string {
-  return `${renderKpiSection(stats)}${renderChartSection(period)}`;
+  return `${renderKpiSection(stats)}${renderChartSectionHx(period)}`;
 }
 
 export function renderCreateForm(): string {
