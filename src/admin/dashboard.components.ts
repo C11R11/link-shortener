@@ -65,15 +65,14 @@ function renderKpi(label: string, value: string): string {
   </div>`;
 }
 
-function renderChartSectionBase(period: StatsPeriod, hxLoad: boolean, chartData: Array<{ bucket: string; count: number }>): string {
-  const loadTrigger = hxLoad ? ` hx-trigger="load" hx-get="/admin/dashboard/stats?period=${period}" hx-target="this" hx-swap="outerHTML"` : '';
+function renderChartSectionBase(period: StatsPeriod, chartData: Array<{ bucket: string; count: number }>): string {
   const labels = escapeHtml(JSON.stringify(chartData.map((d) => d.bucket)));
   const values = escapeHtml(JSON.stringify(chartData.map((d) => d.count)));
-  return `<section class="dash__section" id="chart-section" data-chart='${labels}' data-values='${values}'${loadTrigger}>
+  return `<section class="dash__section" id="chart-section" data-chart='${labels}' data-values='${values}'>
     <div class="dash__section-header">
       <h2 class="dash__section-title">$ clicks --time-series</h2>
       <div class="dash__toolbar">
-        ${['24h', '7d', '30d'].map((p) => `<button class="dash__btn ${p === period ? 'dash__btn--active' : ''}" hx-get="/admin/dashboard/stats?period=${p}" hx-target="#chart-section" hx-swap="outerHTML">${p}</button>`).join('')}
+        ${['24h', '7d', '30d'].map((p) => `<button class="dash__btn ${p === period ? 'dash__btn--active' : ''}" hx-get="/admin/dashboard/stats?period=${p}" hx-target="#stats-container" hx-swap="outerHTML">${p}</button>`).join('')}
       </div>
     </div>
     <div class="dash__section-body">
@@ -82,16 +81,11 @@ function renderChartSectionBase(period: StatsPeriod, hxLoad: boolean, chartData:
   </section>`;
 }
 
-export function renderChartSection(period: StatsPeriod, chartData: Array<{ bucket: string; count: number }>): string {
-  return renderChartSectionBase(period, true, chartData);
-}
-
-export function renderChartSectionHx(period: StatsPeriod, chartData: Array<{ bucket: string; count: number }>): string {
-  return renderChartSectionBase(period, false, chartData);
-}
-
-export function renderStatsFragment(stats: GlobalStats, period: StatsPeriod): string {
-  return `${renderKpiSection(stats)}${renderChartSectionHx(period, stats.chartData)}`;
+export function renderStatsContainer(stats: GlobalStats, period: StatsPeriod): string {
+  return `<div id="stats-container" hx-get="/admin/dashboard/stats?period=${period}" hx-trigger="load" hx-target="this" hx-swap="outerHTML">
+    ${renderKpiSection(stats)}
+    ${renderChartSectionBase(period, stats.chartData)}
+  </div>`;
 }
 
 export function renderCreateForm(): string {
@@ -211,29 +205,39 @@ export function dashboardClientScripts(): string {
         btn.addEventListener('click', () => window.location.reload());
       });
 
+      const charts = new Map();
+
       function initChart(canvas, labels, values, label) {
         const Chart = window.Chart;
         if (!canvas || !Chart) return;
-        new Chart(canvas.getContext('2d'), {
+        const existing = charts.get(canvas);
+        if (existing) existing.destroy();
+        const chart = new Chart(canvas.getContext('2d'), {
           type: 'line',
           data: { labels, datasets: [{ label, data: values, borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', fill: true, tension: 0.3 }] },
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888' }, grid: { color: '#222' } }, y: { ticks: { color: '#888' }, grid: { color: '#222' }, beginAtZero: true } } }
         });
+        charts.set(canvas, chart);
       }
 
-      const mainChart = document.getElementById('clicks-chart');
-      if (mainChart) {
-        const section = mainChart.closest('.dash__section');
-        const labels = section && section.dataset.chart ? JSON.parse(section.dataset.chart) : [];
-        const values = section && section.dataset.values ? JSON.parse(section.dataset.values) : [];
-        initChart(mainChart, labels, values, 'Clicks');
+      function initAllCharts() {
+        const mainChart = document.getElementById('clicks-chart');
+        if (mainChart) {
+          const section = mainChart.closest('.dash__section');
+          const labels = section && section.dataset.chart ? JSON.parse(section.dataset.chart) : [];
+          const values = section && section.dataset.values ? JSON.parse(section.dataset.values) : [];
+          initChart(mainChart, labels, values, 'Clicks');
+        }
+
+        document.querySelectorAll('.detail-chart').forEach((canvas) => {
+          const labels = JSON.parse(canvas.dataset.labels || '[]');
+          const values = JSON.parse(canvas.dataset.values || '[]');
+          initChart(canvas, labels, values, canvas.dataset.type === 'day' ? 'By day' : 'By hour');
+        });
       }
 
-      document.querySelectorAll('.detail-chart').forEach((canvas) => {
-        const labels = JSON.parse(canvas.dataset.labels || '[]');
-        const values = JSON.parse(canvas.dataset.values || '[]');
-        initChart(canvas, labels, values, canvas.dataset.type === 'day' ? 'By day' : 'By hour');
-      });
+      initAllCharts();
+      document.body.addEventListener('htmx:afterSettle', initAllCharts);
     }
 
     if (document.readyState === 'loading') {

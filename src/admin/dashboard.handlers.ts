@@ -5,9 +5,7 @@ import { createStatsService, type StatsPeriod } from '../lib/stats.js';
 import {
   layoutShell,
   renderHeader,
-  renderKpiSection,
-  renderChartSection,
-  renderChartSectionHx,
+  renderStatsContainer,
   renderCreateForm,
   renderLinksTable,
   renderLinkDetail,
@@ -26,8 +24,7 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
 
     const body = `<div class="dash__container">
       ${renderHeader(config)}
-      ${renderKpiSection(await statsService.getGlobalStats(period))}
-      ${renderChartSection(period, (await statsService.getGlobalStats(period)).chartData)}
+      ${renderStatsContainer(await statsService.getGlobalStats(period), period)}
       ${renderCreateForm()}
       ${renderLinksTable(config, items, statsById)}
     </div>`;
@@ -39,7 +36,7 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
     requireAdmin(request);
     const period = normalizePeriod((request.query as { period?: string }).period);
     const stats = await statsService.getGlobalStats(period);
-    return reply.header('Cache-Control', 'no-store').type('text/html').send(renderChartSectionHx(period, stats.chartData));
+    return reply.header('Cache-Control', 'no-store').type('text/html').send(renderStatsContainer(stats, period));
   });
 
   app.get('/admin/dashboard/links/:id/detail', async (request, reply) => {
