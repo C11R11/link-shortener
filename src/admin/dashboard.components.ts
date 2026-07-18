@@ -88,11 +88,15 @@ export function renderStatsContainer(stats: GlobalStats, period: StatsPeriod): s
   </div>`;
 }
 
-export function renderCreateForm(): string {
+export function renderCreateForm(error?: string): string {
+  const errorBanner = error === 'slug-exists'
+    ? '<div class="dash__error">A link with that slug already exists.</div>'
+    : '';
   return `<section class="dash__section">
     <div class="dash__section-header"><h2 class="dash__section-title">$ link create</h2></div>
     <div class="dash__section-body">
-      <form class="dash__form" method="post" action="/admin/links">
+      ${errorBanner}
+      <form class="dash__form" method="post" action="/admin/links" onsubmit="this.querySelector('button[type=submit]').disabled=true;this.querySelector('button[type=submit]').textContent='creating...'">
         <div class="dash__form-row">
           <input class="dash__input" name="slug" placeholder="slug" required />
           <input class="dash__input" name="destinationUrl" placeholder="https://..." required />

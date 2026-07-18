@@ -55,17 +55,34 @@ export function createLinkService(config: AppConfig) {
       return link ?? null;
     },
     async createLink(input: NewLinkInput) {
-      const [created] = await db.insert(links).values({
-        slug: input.slug,
-        destinationUrl: input.destinationUrl,
-        redirectStatusCode: input.redirectStatusCode,
-        title: input.title ?? null,
-        description: input.description ?? null,
-        createdBy: input.createdBy ?? null,
-        expiresAt: input.expiresAt ?? null,
-      }).returning();
+      const existing = await this.getLinkBySlug(input.slug);
+      if (existing) {
+        const error = new Error('Slug already exists') as Error & { statusCode: number };
+        error.statusCode = 409;
+        throw error;
+      }
 
-      return created;
+      try {
+        const [created] = await db.insert(links).values({
+          slug: input.slug,
+          destinationUrl: input.destinationUrl,
+          redirectStatusCode: input.redirectStatusCode,
+          title: input.title ?? null,
+          description: input.description ?? null,
+          createdBy: input.createdBy ?? null,
+          expiresAt: input.expiresAt ?? null,
+        }).returning();
+
+        return created;
+      } catch (err) {
+        const pgError = err as { code?: string };
+        if (pgError?.code === '23505') {
+          const error = new Error('Slug already exists') as Error & { statusCode: number };
+          error.statusCode = 409;
+          throw error;
+        }
+        throw err;
+      }
     },
     async updateLink(id: string, patch: Partial<NewLinkInput> & { status?: 'active' | 'disabled' | 'archived' | null }) {
       const nextValues: Partial<{

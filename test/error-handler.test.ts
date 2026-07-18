@@ -232,3 +232,35 @@ test('error handler preserves statusCode from thrown error in production', async
   assert.equal(body.error, 'Forbidden');
   assert.doesNotMatch(body.error, /not allowed/);
 });
+
+test('error handler returns 409 for duplicate slug on POST /api/links in production', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  const service: LinkService = makeServiceForStats();
+  service.createLink = async () => {
+    const error = new Error('Slug already exists') as Error & { statusCode: number };
+    error.statusCode = 409;
+    throw error;
+  };
+
+  const app = await buildApp(service);
+  const response = await app.inject({
+    method: 'POST',
+    url: '/api/links',
+    headers: {
+      authorization: 'Bearer change-me',
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    payload: 'slug=demo&destinationUrl=https%3A%2F%2Fexample.com&redirectStatusCode=302',
+  });
+
+  assert.equal(response.statusCode, 409);
+  const body = response.json();
+  assert.equal(body.error, 'Conflict');
+  assert.doesNotMatch(body.error, /Slug already exists/);
+});

@@ -122,4 +122,51 @@ describe('dashboard handlers', () => {
     assert.ok(res.headers['content-type']?.includes('text/html'));
     assert.ok(res.body.includes('stats --summary'));
   });
+
+  it('redirects POST /admin/links to /admin/dashboard?error=slug-exists on duplicate slug', async () => {
+    const service = makeLinkService();
+    service.createLink = async () => {
+      const error = new Error('Slug already exists') as Error & { statusCode: number };
+      error.statusCode = 409;
+      throw error;
+    };
+    const app = await buildApp(service);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/admin/links',
+      headers: {
+        authorization: `Bearer ${ADMIN_TOKEN}`,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: 'slug=demo&destinationUrl=https%3A%2F%2Fexample.com&redirectStatusCode=302',
+    });
+    assert.equal(res.statusCode, 302);
+    assert.equal(res.headers.location, '/admin/dashboard?error=slug-exists');
+  });
+
+  it('renders error banner text on GET /admin/dashboard?error=slug-exists', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/dashboard?error=slug-exists',
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    assert.equal(res.statusCode, 200);
+    assert.ok(res.headers['content-type']?.includes('text/html'));
+    assert.ok(res.body.includes('A link with that slug already exists'));
+  });
+
+  it('create form markup includes onsubmit handler that disables the submit button', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/dashboard',
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    assert.equal(res.statusCode, 200);
+    assert.ok(
+      res.body.includes('onsubmit="this.querySelector(\'button[type=submit]\').disabled=true;this.querySelector(\'button[type=submit]\').textContent=\'creating...\'"'),
+      'expected the create form to include an onsubmit handler that disables the submit button',
+    );
+  });
 });

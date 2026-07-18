@@ -21,11 +21,12 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
     const items = await links.listLinks();
     const statsById = new Map(await Promise.all(items.map(async (item) => [item.id, await links.getLinkStats(item.id)] as const)));
     const period: StatsPeriod = '7d';
+    const error = (request.query as { error?: string }).error;
 
     const body = `<div class="dash__container">
       ${renderHeader(config)}
       ${renderStatsContainer(await statsService.getGlobalStats(period), period)}
-      ${renderCreateForm()}
+      ${renderCreateForm(error)}
       ${renderLinksTable(config, items, statsById)}
     </div>`;
 

@@ -332,15 +332,24 @@ export function createApp(config: AppConfig, links: LinkService) {
       return reply.code(400).send({ error: 'destinationUrl must start with http:// or https://' });
     }
 
-    const created = await links.createLink({
-      slug: body.slug.trim(),
-      destinationUrl: body.destinationUrl.trim(),
-      redirectStatusCode: normalizeRedirectCode(body.redirectStatusCode, config.REDIRECT_STATUS_CODE),
-      title: body.title?.trim() || null,
-      description: body.description?.trim() || null,
-      createdBy: body.createdBy?.trim() || null,
-      expiresAt: parseDateTimeLocal(body.expiresAt),
-    });
+    let created: LinkRecord;
+    try {
+      created = await links.createLink({
+        slug: body.slug.trim(),
+        destinationUrl: body.destinationUrl.trim(),
+        redirectStatusCode: normalizeRedirectCode(body.redirectStatusCode, config.REDIRECT_STATUS_CODE),
+        title: body.title?.trim() || null,
+        description: body.description?.trim() || null,
+        createdBy: body.createdBy?.trim() || null,
+        expiresAt: parseDateTimeLocal(body.expiresAt),
+      });
+    } catch (err) {
+      const statusCode = (err as Error & { statusCode?: number }).statusCode;
+      if (statusCode === 409) {
+        return reply.redirect('/admin/dashboard?error=slug-exists');
+      }
+      throw err;
+    }
 
     if (body.status && body.status !== 'active') {
       await links.updateLink(created.id, { status: body.status });
