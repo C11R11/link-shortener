@@ -75,5 +75,5 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: deploy
           key: ${{ secrets.PROD_SSH_KEY }}
-        script: |
-          sudo /usr/local/bin/deploy-link-shortener.sh ${{ github.sha }}
+          script: |
+            sudo /usr/local/bin/deploy-link-shortener.sh ${{ github.sha }}
