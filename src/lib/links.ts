@@ -35,6 +35,7 @@ export type LinkStats = {
     referrer: string | null;
     userAgent: string | null;
     country: string | null;
+    ipAddress: string | null;
   }>;
 };
 
@@ -119,7 +120,7 @@ export function createLinkService(config: AppConfig) {
 
       return updated ?? null;
     },
-    async recordClick(link: LinkRecord, event: { referrer?: string | null; userAgent?: string | null; country?: string | null; ipHash?: string | null }) {
+    async recordClick(link: LinkRecord, event: { referrer?: string | null; userAgent?: string | null; country?: string | null; ipHash?: string | null; ipAddress?: string | null }) {
       await db.transaction(async (tx) => {
         await tx.insert(linkClicks).values({
           linkId: link.id,
@@ -127,6 +128,7 @@ export function createLinkService(config: AppConfig) {
           userAgent: event.userAgent ?? null,
           country: event.country ?? null,
           ipHash: event.ipHash ?? null,
+          ipAddress: event.ipAddress ?? null,
         });
 
         await tx.update(links).set({
@@ -173,6 +175,7 @@ export function createLinkService(config: AppConfig) {
         referrer: linkClicks.referrer,
         userAgent: linkClicks.userAgent,
         country: linkClicks.country,
+        ipAddress: linkClicks.ipAddress,
       }).from(linkClicks).where(eq(linkClicks.linkId, id)).orderBy(desc(linkClicks.clickedAt)).limit(10);
 
       return {

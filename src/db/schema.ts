@@ -29,6 +29,7 @@ export const linkClicks = pgTable('link_clicks', {
   userAgent: text('user_agent'),
   country: text('country'),
   ipHash: text('ip_hash'),
+  ipAddress: text('ip_address'),
 });
 
 export const linkRelations = relations(links, ({ many }) => ({

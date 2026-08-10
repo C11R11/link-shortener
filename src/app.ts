@@ -47,6 +47,7 @@ export type LinkStats = {
     referrer: string | null;
     userAgent: string | null;
     country: string | null;
+    ipAddress: string | null;
   }>;
 };
 
@@ -79,13 +80,13 @@ export type LinkService = {
   disableLink(id: string): Promise<LinkRecord | null>;
   recordClick(
     link: LinkRecord,
-    event: { referrer?: string | null; userAgent?: string | null; country?: string | null; ipHash?: string | null },
+    event: { referrer?: string | null; userAgent?: string | null; country?: string | null; ipHash?: string | null; ipAddress?: string | null },
   ): Promise<void>;
   getLinkStats(id: string): Promise<LinkStats | null>;
 };
 
 export function createApp(config: AppConfig, links: LinkService) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, trustProxy: true });
   const registerHelmet = async () => {
     if (config.SHORTENER_SCHEME === 'http') {
       await app.register(helmet, { contentSecurityPolicy: false });
@@ -305,6 +306,7 @@ export function createApp(config: AppConfig, links: LinkService) {
       userAgent: request.headers['user-agent'] ?? null,
       country: typeof request.headers['cf-ipcountry'] === 'string' ? request.headers['cf-ipcountry'] : null,
       ipHash: request.ip ? crypto.createHash('sha256').update(request.ip).digest('hex') : null,
+      ipAddress: request.ip ?? null,
     });
 
     reply.code(link.redirectStatusCode || config.REDIRECT_STATUS_CODE);
