@@ -13,6 +13,7 @@ import type { AuthService } from './auth/types.js';
 import { createRequireAdmin } from './auth/middleware.js';
 import { registerAuth } from './auth/handlers.js';
 import { csrfFailureRedirect, validateCsrfToken } from './auth/csrf.js';
+import { getCountryFromIP } from './lib/geo.js';
 
 export type LinkRecord = {
   id: string;
@@ -274,7 +275,9 @@ export function createApp(config: AppConfig, links: LinkService, auth: AuthServi
     await links.recordClick(link, {
       referrer: request.headers.referer ?? null,
       userAgent: request.headers['user-agent'] ?? null,
-      country: typeof request.headers['cf-ipcountry'] === 'string' ? request.headers['cf-ipcountry'] : null,
+      country: typeof request.headers['cf-ipcountry'] === 'string' && request.headers['cf-ipcountry'].trim() !== ''
+        ? request.headers['cf-ipcountry'].trim()
+        : getCountryFromIP(request.ip),
       ipHash: request.ip ? crypto.createHash('sha256').update(request.ip).digest('hex') : null,
       ipAddress: request.ip ?? null,
     });

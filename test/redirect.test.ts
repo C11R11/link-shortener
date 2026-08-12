@@ -37,9 +37,21 @@ function makeLink(overrides: Partial<LinkRecord> = {}): LinkRecord {
   };
 }
 
-function makeService(link: LinkRecord | null): LinkService & { recordClickCalls: number } {
+function makeService(
+  link: LinkRecord | null,
+): LinkService & {
+  recordClickCalls: number;
+  lastRecordClickEvent: null | {
+    referrer?: string | null;
+    userAgent?: string | null;
+    country?: string | null;
+    ipHash?: string | null;
+    ipAddress?: string | null;
+  };
+} {
   return {
     recordClickCalls: 0,
+    lastRecordClickEvent: null,
     async listLinks() {
       return link ? [link] : [];
     },
@@ -58,8 +70,9 @@ function makeService(link: LinkRecord | null): LinkService & { recordClickCalls:
     async disableLink() {
       return link;
     },
-    async recordClick() {
+    async recordClick(_link, event) {
       this.recordClickCalls += 1;
+      this.lastRecordClickEvent = event;
     },
     async getLinkStats() {
       return link
@@ -67,6 +80,8 @@ function makeService(link: LinkRecord | null): LinkService & { recordClickCalls:
             link,
             totalClicks: 0,
             clicksLast7Days: 0,
+            clicksByDay: [],
+            clicksByHour: [],
             topReferrers: [],
             recentClicks: [],
           } satisfies LinkStats
@@ -132,6 +147,43 @@ test('returns 404 for unknown slugs', async () => {
   assert.equal(response.statusCode, 404);
   assert.match(response.payload, /Link not found/);
   assert.equal(service.recordClickCalls, 0);
+});
+
+test('falls back to IP-based country lookup when cf-ipcountry header is missing', async () => {
+  const link = makeLink();
+  const service = makeService(link);
+  const { app, ready } = createApp(baseConfig, service, makeFakeAuth());
+  await ready();
+
+  const response = await app.inject({
+    method: 'GET',
+    url: '/demo',
+    headers: { 'x-forwarded-for': '8.8.8.8' },
+  });
+
+  assert.equal(response.statusCode, 302);
+  assert.equal(service.recordClickCalls, 1);
+  assert.equal(service.lastRecordClickEvent?.country, 'US');
+});
+
+test('prefers cf-ipcountry header over IP-based country lookup', async () => {
+  const link = makeLink();
+  const service = makeService(link);
+  const { app, ready } = createApp(baseConfig, service, makeFakeAuth());
+  await ready();
+
+  const response = await app.inject({
+    method: 'GET',
+    url: '/demo',
+    headers: {
+      'cf-ipcountry': 'AR',
+      'x-forwarded-for': '8.8.8.8',
+    },
+  });
+
+  assert.equal(response.statusCode, 302);
+  assert.equal(service.recordClickCalls, 1);
+  assert.equal(service.lastRecordClickEvent?.country, 'AR');
 });
 
 test('exposes stats payload', async () => {

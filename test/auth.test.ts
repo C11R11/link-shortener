@@ -252,6 +252,8 @@ describe('auth routes', () => {
   it('POST /admin/login with invalid credentials returns 401 and re-renders login', async () => {
     const app = await buildApp();
     const { csrfToken, csrfCookie } = await loginPage(app);
+    assert.ok(csrfToken, 'expected csrf token');
+    assert.ok(csrfCookie, 'expected csrf cookie');
     const res = await app.inject({
       method: 'POST',
       url: '/admin/login',
@@ -259,7 +261,7 @@ describe('auth routes', () => {
         'content-type': 'application/x-www-form-urlencoded',
         cookie: csrfCookie,
       },
-      payload: `email=admin@example.com&password=wrongpassword&csrfToken=${encodeURIComponent(csrfToken ?? '')}`,
+      payload: `email=admin@example.com&password=wrongpassword&csrfToken=${encodeURIComponent(csrfToken)}`,
     });
     assert.equal(res.statusCode, 401);
     assert.match(res.body, /Invalid email or password/i);
