@@ -88,15 +88,21 @@ export function renderStatsContainer(stats: GlobalStats, period: StatsPeriod): s
   </div>`;
 }
 
-export function renderCreateForm(error?: string): string {
+export function renderCreateForm(error?: string, csrfToken?: string): string {
   const errorBanner = error === 'slug-exists'
     ? '<div class="dash__error">A link with that slug already exists.</div>'
+    : error === 'csrf'
+      ? '<div class="dash__error">Your session expired or the form token was invalid. Please try again.</div>'
+      : '';
+  const csrfInput = csrfToken
+    ? `<input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />`
     : '';
   return `<section class="dash__section">
     <div class="dash__section-header"><h2 class="dash__section-title">$ link create</h2></div>
     <div class="dash__section-body">
       ${errorBanner}
       <form class="dash__form" method="post" action="/admin/links" onsubmit="this.querySelector('button[type=submit]').disabled=true;this.querySelector('button[type=submit]').textContent='creating...'">
+        ${csrfInput}
         <div class="dash__form-row">
           <input class="dash__input" name="slug" placeholder="slug" required />
           <input class="dash__input" name="destinationUrl" placeholder="https://..." required />
@@ -134,7 +140,7 @@ function renderLinkRow(config: AppConfig, link: LinkRecord, stats: LinkStats | n
   <tr class="dash__detail" style="display:none"><td colspan="5"></td></tr>`;
 }
 
-export function renderLinkDetail(stats: LinkStats, config: AppConfig): string {
+export function renderLinkDetail(stats: LinkStats, config: AppConfig, csrfToken?: string): string {
   return `<tr class="dash__detail">
     <td colspan="5">
       <div class="dash__detail-grid">
@@ -165,6 +171,7 @@ export function renderLinkDetail(stats: LinkStats, config: AppConfig): string {
         <h3 class="dash__section-title">$ link edit ${stats.link.id}</h3>
         <form class="dash__form" method="post" action="/admin/links/${stats.link.id}">
           <input type="hidden" name="_method" value="patch" />
+          ${csrfToken ? `<input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />` : ''}
           <div class="dash__form-row">
             <input class="dash__input" name="slug" value="${escapeHtml(stats.link.slug)}" />
             <input class="dash__input" name="destinationUrl" value="${escapeHtml(stats.link.destinationUrl)}" />

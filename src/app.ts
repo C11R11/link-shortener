@@ -3,11 +3,16 @@ import helmet from '@fastify/helmet';
 import formbody from '@fastify/formbody';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import fastifyCookie from '@fastify/cookie';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBaseUrl, type AppConfig } from './config.js';
 import { registerDashboard } from './admin/dashboard.handlers.js';
+import type { AuthService } from './auth/types.js';
+import { createRequireAdmin } from './auth/middleware.js';
+import { registerAuth } from './auth/handlers.js';
+import { csrfFailureRedirect, validateCsrfToken } from './auth/csrf.js';
 
 export type LinkRecord = {
   id: string;
@@ -85,8 +90,9 @@ export type LinkService = {
   getLinkStats(id: string): Promise<LinkStats | null>;
 };
 
-export function createApp(config: AppConfig, links: LinkService) {
+export function createApp(config: AppConfig, links: LinkService, auth: AuthService) {
   const app = Fastify({ logger: true, trustProxy: true });
+  const guards = createRequireAdmin(auth, config);
   const registerHelmet = async () => {
     if (config.SHORTENER_SCHEME === 'http') {
       await app.register(helmet, { contentSecurityPolicy: false });
@@ -111,6 +117,7 @@ export function createApp(config: AppConfig, links: LinkService) {
   const setup = async () => {
     await registerHelmet();
     await app.register(formbody);
+    await app.register(fastifyCookie, { secret: config.SESSION_SECRET });
     await app.register(rateLimit, {
       global: true,
       max: 120,
@@ -122,40 +129,8 @@ export function createApp(config: AppConfig, links: LinkService) {
       prefix: '/admin/',
       serveDotFiles: false,
     });
-    registerDashboard(app, config, links, requireAdmin);
-  };
-
-  const isAuthorized = (request: { headers: Record<string, unknown> }) => {
-    const header = request.headers.authorization;
-    if (typeof header !== 'string') {
-      return false;
-    }
-
-    if (header === `Bearer ${config.ADMIN_TOKEN}`) {
-      return true;
-    }
-
-    if (header.startsWith('Basic ')) {
-      const encoded = header.slice(6);
-      try {
-        const decoded = Buffer.from(encoded, 'base64').toString('utf8');
-        const [, password] = decoded.split(':', 2);
-        return password === config.ADMIN_TOKEN;
-      } catch {
-        return false;
-      }
-    }
-
-    return false;
-  };
-
-  const requireAdmin = (request: { headers: Record<string, unknown> }) => {
-    if (!isAuthorized(request)) {
-      const error = new Error('Unauthorized');
-      // @ts-expect-error Fastify decorations are runtime-only here
-      error.statusCode = 401;
-      throw error;
-    }
+    registerDashboard(app, config, links, guards);
+    registerAuth(app, config, auth);
   };
 
   app.get('/healthz', async () => ({
@@ -172,8 +147,7 @@ export function createApp(config: AppConfig, links: LinkService) {
     };
   });
 
-  app.post('/api/links', async (request, reply) => {
-    requireAdmin(request);
+  app.post('/api/links', { preHandler: guards.requireAdminApi }, async (request, reply) => {
     const body = request.body as {
       slug?: string;
       destinationUrl?: string;
@@ -208,8 +182,7 @@ export function createApp(config: AppConfig, links: LinkService) {
     });
   });
 
-  app.get('/api/links/:id', async (request, reply) => {
-    requireAdmin(request);
+  app.get('/api/links/:id', { preHandler: guards.requireAdminApi }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const link = await links.getLinkById(id);
     if (!link) {
@@ -222,8 +195,7 @@ export function createApp(config: AppConfig, links: LinkService) {
     };
   });
 
-  app.patch('/api/links/:id', async (request, reply) => {
-    requireAdmin(request);
+  app.patch('/api/links/:id', { preHandler: guards.requireAdminApi }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as {
       slug?: string;
@@ -257,8 +229,7 @@ export function createApp(config: AppConfig, links: LinkService) {
     };
   });
 
-  app.delete('/api/links/:id', async (request, reply) => {
-    requireAdmin(request);
+  app.delete('/api/links/:id', { preHandler: guards.requireAdminApi }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const disabled = await links.disableLink(id);
     if (!disabled) {
@@ -268,8 +239,7 @@ export function createApp(config: AppConfig, links: LinkService) {
     return reply.code(204).send();
   });
 
-  app.get('/api/links/:id/stats', async (request, reply) => {
-    requireAdmin(request);
+  app.get('/api/links/:id/stats', { preHandler: guards.requireAdminApi }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const stats = await links.getLinkStats(id);
     if (!stats) {
@@ -313,8 +283,10 @@ export function createApp(config: AppConfig, links: LinkService) {
     return reply.redirect(link.destinationUrl);
   });
 
-  app.post('/admin/links', async (request, reply) => {
-    requireAdmin(request);
+  app.post('/admin/links', { preHandler: guards.requireAdminHtml }, async (request, reply) => {
+    if (!validateCsrfToken(request, config)) {
+      return csrfFailureRedirect(reply).send();
+    }
     const body = request.body as {
       slug?: string;
       destinationUrl?: string;
@@ -360,8 +332,10 @@ export function createApp(config: AppConfig, links: LinkService) {
     return reply.redirect('/admin/dashboard');
   });
 
-  app.post('/admin/links/:id', async (request, reply) => {
-    requireAdmin(request);
+  app.post('/admin/links/:id', { preHandler: guards.requireAdminHtml }, async (request, reply) => {
+    if (!validateCsrfToken(request, config)) {
+      return csrfFailureRedirect(reply).send();
+    }
     const { id } = request.params as { id: string };
     const body = request.body as {
       slug?: string;
@@ -402,7 +376,11 @@ export function createApp(config: AppConfig, links: LinkService) {
       : 500;
 
     if (statusCode === 401) {
-      reply.header('WWW-Authenticate', 'Basic realm="Link Shortener Admin"');
+      const url = request.url ?? '';
+      if (url.startsWith('/admin/')) {
+        reply.header('Location', '/admin/login');
+        return reply.code(302).send();
+      }
     }
 
     const isProduction = process.env.NODE_ENV === 'production';

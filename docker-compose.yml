@@ -22,6 +22,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       APP_PORT: 3000
       SHORTENER_DOMAIN: ${SHORTENER_DOMAIN:-go.example.com}

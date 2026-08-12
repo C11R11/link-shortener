@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { integer, pgTable, text, timestamp, uuid, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 export const links = pgTable('links', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -32,6 +32,30 @@ export const linkClicks = pgTable('link_clicks', {
   ipAddress: text('ip_address'),
 });
 
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull(),
+  name: text('name'),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role').notNull().default('admin'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  emailIdx: uniqueIndex('users_email_unique').on(table.email),
+}));
+
+export const sessions = pgTable('sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tokenHashIdx: uniqueIndex('sessions_token_hash_unique').on(table.tokenHash),
+  userIdIdx: index('sessions_user_id_idx').on(table.userId),
+}));
+
 export const linkRelations = relations(links, ({ many }) => ({
   clicks: many(linkClicks),
 }));
@@ -40,5 +64,16 @@ export const clickRelations = relations(linkClicks, ({ one }) => ({
   link: one(links, {
     fields: [linkClicks.linkId],
     references: [links.id],
+  }),
+}));
+
+export const userRelations = relations(users, ({ many }) => ({
+  sessions: many(sessions),
+}));
+
+export const sessionRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
   }),
 }));

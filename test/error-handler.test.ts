@@ -2,12 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, type LinkService, type LinkRecord, type LinkStats } from '../src/app.js';
 import type { AppConfig } from '../src/config.js';
+import { makeFakeAuth, loginAsAdmin } from './helpers/auth.js';
 
 const baseConfig: AppConfig = {
   APP_PORT: 3000,
   SHORTENER_DOMAIN: 'test.local',
   SHORTENER_SCHEME: 'http',
   DATABASE_URL: 'postgres://shortener:shortener@db:5432/shortener',
+  SESSION_SECRET: 'test-session-secret-that-is-long-enough-32+',
+  SESSION_MAX_AGE_SECONDS: 604800,
+  SESSION_COOKIE_NAME: 'link_shortener_session',
+  CSRF_COOKIE_NAME: 'link_shortener_csrf',
   ADMIN_TOKEN: 'change-me',
   REDIRECT_STATUS_CODE: 302,
 };
@@ -87,7 +92,7 @@ function makeServiceForStats(): LinkService {
 }
 
 async function buildApp(service: LinkService) {
-  const { app, ready } = createApp(baseConfig, service);
+  const { app, ready } = createApp(baseConfig, service, makeFakeAuth());
   await ready();
   return app;
 }
@@ -125,10 +130,13 @@ test('error handler in production returns generic messages for 5xx', async (t) =
   });
 
   const app = await buildApp(makeServiceForStats());
+  // Authenticate via the session login flow so the request reaches the
+  // stats endpoint that throws a 500.
+  const cookies = await loginAsAdmin(app);
   const response = await app.inject({
     method: 'GET',
     url: '/api/links/link-1/stats',
-    headers: { authorization: 'Bearer change-me' },
+    headers: { cookie: cookies },
   });
 
   assert.equal(response.statusCode, 500);
@@ -140,7 +148,7 @@ test('error handler in production returns generic messages for 5xx', async (t) =
   assert.doesNotMatch(body.error, /secret/);
 });
 
-test('error handler in production returns generic messages for 401', async (t) => {
+test('error handler in production returns 302 redirect to /admin/login for unauthenticated dashboard request', async (t) => {
   const previousEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   t.after(() => {
@@ -154,14 +162,32 @@ test('error handler in production returns generic messages for 401', async (t) =
     url: '/admin/dashboard',
   });
 
+  // The HTML guard redirects unauthenticated requests to the login page
+  // instead of returning a 401 JSON body.
+  assert.equal(response.statusCode, 302);
+  assert.equal(response.headers.location, '/admin/login');
+});
+
+test('error handler in production returns generic 401 JSON for unauthenticated API request', async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  t.after(() => {
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+  });
+
+  const app = await buildApp(makeServiceForStats());
+  const response = await app.inject({
+    method: 'GET',
+    url: '/api/links/link-1/stats',
+    headers: { authorization: 'Bearer invalid' },
+  });
+
   assert.equal(response.statusCode, 401);
   const body = response.json();
-  // requireAdmin throws Error('Unauthorized') with statusCode 401.
-  // In production we still want a generic message — even though both
-  // strings happen to match here, the contract is generic-only.
   assert.equal(body.error, 'Unauthorized');
-  // 401 should still set WWW-Authenticate so clients can prompt for credentials.
-  assert.equal(response.headers['www-authenticate'], 'Basic realm="Link Shortener Admin"');
+  // Session-based auth no longer sends WWW-Authenticate.
+  assert.equal(response.headers['www-authenticate'], undefined);
 });
 
 test('error handler in production does not leak 4xx error.message from downstream', async (t) => {
@@ -249,11 +275,12 @@ test('error handler returns 409 for duplicate slug on POST /api/links in product
   };
 
   const app = await buildApp(service);
+  const cookies = await loginAsAdmin(app);
   const response = await app.inject({
     method: 'POST',
     url: '/api/links',
     headers: {
-      authorization: 'Bearer change-me',
+      cookie: cookies,
       'content-type': 'application/x-www-form-urlencoded',
     },
     payload: 'slug=demo&destinationUrl=https%3A%2F%2Fexample.com&redirectStatusCode=302',

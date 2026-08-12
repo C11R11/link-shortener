@@ -2,12 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, type LinkService, type LinkRecord, type LinkStats } from '../src/app.js';
 import type { AppConfig } from '../src/config.js';
+import { makeFakeAuth, loginAsAdmin } from './helpers/auth.js';
 
 const baseConfig: AppConfig = {
   APP_PORT: 3000,
   SHORTENER_DOMAIN: 'test.local',
   SHORTENER_SCHEME: 'http',
   DATABASE_URL: 'postgres://shortener:shortener@db:5432/shortener',
+  SESSION_SECRET: 'test-session-secret-that-is-long-enough-32+',
+  SESSION_MAX_AGE_SECONDS: 604800,
+  SESSION_COOKIE_NAME: 'link_shortener_session',
+  CSRF_COOKIE_NAME: 'link_shortener_csrf',
   ADMIN_TOKEN: 'change-me',
   REDIRECT_STATUS_CODE: 302,
 };
@@ -70,11 +75,17 @@ function makeService(link: LinkRecord | null): LinkService & { recordClickCalls:
   };
 }
 
+async function buildApp(link: LinkRecord | null) {
+  const { app, ready } = createApp(baseConfig, makeService(link), makeFakeAuth());
+  await ready();
+  return app;
+}
+
 test('redirects use the per-link status code', async () => {
   for (const statusCode of [301, 302, 307, 308] as const) {
     const link = makeLink({ redirectStatusCode: statusCode });
     const service = makeService(link);
-    const { app, ready } = createApp(baseConfig, service);
+    const { app, ready } = createApp(baseConfig, service, makeFakeAuth());
     await ready();
 
     const response = await app.inject({ method: 'GET', url: '/demo' });
@@ -88,7 +99,7 @@ test('redirects use the per-link status code', async () => {
 test('returns 410 for disabled links', async () => {
   const link = makeLink({ status: 'disabled' });
   const service = makeService(link);
-  const { app, ready } = createApp(baseConfig, service);
+  const { app, ready } = createApp(baseConfig, service, makeFakeAuth());
   await ready();
 
   const response = await app.inject({ method: 'GET', url: '/demo' });
@@ -101,7 +112,7 @@ test('returns 410 for disabled links', async () => {
 test('returns 410 for expired links', async () => {
   const link = makeLink({ expiresAt: new Date('2026-07-12T00:00:00Z') });
   const service = makeService(link);
-  const { app, ready } = createApp(baseConfig, service);
+  const { app, ready } = createApp(baseConfig, service, makeFakeAuth());
   await ready();
 
   const response = await app.inject({ method: 'GET', url: '/demo' });
@@ -113,7 +124,7 @@ test('returns 410 for expired links', async () => {
 
 test('returns 404 for unknown slugs', async () => {
   const service = makeService(null);
-  const { app, ready } = createApp(baseConfig, service);
+  const { app, ready } = createApp(baseConfig, service, makeFakeAuth());
   await ready();
 
   const response = await app.inject({ method: 'GET', url: '/missing' });
@@ -125,11 +136,14 @@ test('returns 404 for unknown slugs', async () => {
 
 test('exposes stats payload', async () => {
   const link = makeLink();
-  const service = makeService(link);
-  const { app, ready } = createApp(baseConfig, service);
-  await ready();
-
-  const response = await app.inject({ method: 'GET', url: '/api/links/link-1/stats', headers: { authorization: 'Bearer change-me' } });
+  const app = await buildApp(link);
+  // Authenticate via session login instead of bearer token.
+  const cookies = await loginAsAdmin(app);
+  const response = await app.inject({
+    method: 'GET',
+    url: '/api/links/link-1/stats',
+    headers: { cookie: cookies },
+  });
   const payload = response.json();
 
   assert.equal(response.statusCode, 200);

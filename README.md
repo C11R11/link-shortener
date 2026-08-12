@@ -9,7 +9,7 @@ A self-hosted link shortener with an admin dashboard and click analytics, built 
 - Admin dashboard with create/edit/disable flow and per-link analytics (total clicks, last 7 days, hourly buckets, top referrers, recent clicks).
 - JSON API for programmatic link management.
 - Per-link expiration, status (`active`, `disabled`, `archived`), title, description, and ownership metadata.
-- Built-in security middleware: Helmet with CSP, global rate limiting, and admin bearer auth.
+- Built-in security middleware: Helmet with CSP, global rate limiting, and session-based admin auth (Argon2id + signed cookies + CSRF).
 - Privacy-friendly click capture: only a hashed client IP is stored.
 
 ## Tech Stack
@@ -26,9 +26,10 @@ A self-hosted link shortener with an admin dashboard and click analytics, built 
 git clone https://github.com/<your-org>/link-shortener.git
 cd link-shortener
 cp .env.example .env
-# Edit .env and set ADMIN_TOKEN, DATABASE_URL, SHORTENER_DOMAIN at minimum.
+# Edit .env and set DATABASE_URL, SHORTENER_DOMAIN, and SESSION_SECRET at minimum.
 docker compose up --build -d
 npm run migrate
+npm run create-admin -- --email=admin@example.com --password='choose-a-strong-password'
 npm run seed   # optional: only for local development
 ```
 
@@ -46,9 +47,9 @@ npm run seed   # optional: only for local development
 > ```
 >
 > Without it, the app will refuse to start (Zod fails fast on a missing
-> `DATABASE_URL` / `ADMIN_TOKEN` / `SHORTENER_DOMAIN`).
+> `DATABASE_URL` / `SESSION_SECRET` / `SHORTENER_DOMAIN`).
 
-Open the dashboard at `http://localhost:3000/admin/dashboard` and authenticate with `Authorization: Bearer <ADMIN_TOKEN>`.
+Open the dashboard at `http://localhost:3000/admin/dashboard` and log in with the admin credentials you created above.
 
 ## Environment Variables
 
@@ -60,20 +61,57 @@ All variables are loaded through a Zod schema in `src/config.ts`. The app fails 
 | `SHORTENER_DOMAIN` | Yes | — | Hostname used to build short URLs (e.g. `go.example.com`). |
 | `SHORTENER_SCHEME` | No | `https` | `http` or `https`. `http` disables CSP for local development. |
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string. |
-| `ADMIN_TOKEN` | Yes | — | Bearer token for dashboard and write endpoints. Use a long random secret. |
+| `SESSION_SECRET` | Yes | — | Secret used to sign session and CSRF cookies. Must be at least 32 characters. Generate with `node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"`. |
+| `SESSION_MAX_AGE_SECONDS` | No | `604800` | Session lifetime in seconds (default 7 days). |
+| `SESSION_COOKIE_NAME` | No | `link_shortener_session` | Name of the signed session cookie. |
+| `CSRF_COOKIE_NAME` | No | `link_shortener_csrf` | Name of the signed CSRF cookie. |
+| `ADMIN_TOKEN` | No | — | **Deprecated legacy fallback.** When set, still authenticates `/api/*` requests via `Authorization: Bearer <token>` (or Basic auth). The HTML dashboard requires a session login. See [Migrating from ADMIN_TOKEN](#migrating-from-admin_token). |
 | `REDIRECT_STATUS_CODE` | No | `302` | Default redirect status code when a link does not override it. Must be 301, 302, 307, or 308. |
 
 ## Admin Dashboard
 
 - **URL:** `GET /admin/dashboard`
-- **Auth:** send `Authorization: Bearer <ADMIN_TOKEN>` (or `Basic base64(:<ADMIN_TOKEN>)`).
-- **Features:** create links, edit slug/destination/redirect code/title/description/expires, disable or archive links, view click charts and referrer breakdowns.
+- **Auth:** session-based login. Unauthenticated requests are redirected to `/admin/login`.
+- **Features:** create links, edit slug/destination/redirect code/title/description/expires, disable or archive links, view click charts and referrer breakdowns, change your own password.
 
-The dashboard is served as static HTML from `src/admin/` and progressively enhanced with HTMX.
+The dashboard is served as static HTML from `src/admin/` and progressively enhanced with HTMX. All POST forms include a CSRF token bound to a short-lived signed cookie.
+
+### Creating the first admin
+
+Before anyone can log in, create an admin user in the database:
+
+```bash
+npm run create-admin -- --email=admin@example.com --password='choose-a-strong-password' [--name='Admin']
+```
+
+The script is idempotent: if a user with that email already exists it exits 0 without changes. Passwords must be at least 8 characters; choose something long and random.
+
+### Rotating credentials
+
+To rotate an admin's password without restarting the service (and to invalidate all of their existing sessions):
+
+```bash
+npm run rotate-credentials -- --email=admin@example.com --password='new-strong-password'
+```
+
+Logged-in admins can also rotate their own password from the dashboard via **Change password**.
+
+### Migrating from ADMIN_TOKEN
+
+Older releases used a single shared `ADMIN_TOKEN` for everything. The new session-based system is the recommended way to authenticate, but `ADMIN_TOKEN` is still honored as a **fallback for the JSON API only** (`/api/*`). The HTML dashboard (`/admin/*`) requires a full session login regardless of `ADMIN_TOKEN`.
+
+To migrate an existing deployment:
+
+1. Provision a strong `SESSION_SECRET` (see the env table).
+2. Create at least one admin user with `npm run create-admin`.
+3. Log in to the dashboard once to verify the new flow works end-to-end.
+4. Remove `ADMIN_TOKEN` from your environment (unset the variable or delete the line from `.env` / your secrets manager / `docker-compose.yml`) and restart the service.
+
+Until you remove it, scripts and CI tokens that use `Authorization: Bearer <ADMIN_TOKEN>` will keep working against `/api/*` — handy for staged rollouts and emergency access, but not something to leave set long-term.
 
 ## API Endpoints
 
-All write endpoints and stats require the `Authorization: Bearer <ADMIN_TOKEN>` header.
+Write endpoints and stats accept either a session cookie (set by `POST /admin/login`) or, if `ADMIN_TOKEN` is configured, the legacy `Authorization: Bearer <ADMIN_TOKEN>` header (or `Basic base64(:<ADMIN_TOKEN>)`).
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
@@ -109,7 +147,7 @@ The test suite is `node:test` with `tsx` as the loader. Integration tests live i
 
 ## Deployment Notes
 
-- **Never deploy the docker-compose defaults.** Replace `DATABASE_URL`, `ADMIN_TOKEN`, and PostgreSQL credentials with values from a secrets manager.
+- **Never deploy the docker-compose defaults.** Replace `DATABASE_URL`, `SESSION_SECRET`, and PostgreSQL credentials with values from a secrets manager.
 - **Run migrations explicitly.** The Docker image starts the app but does not auto-migrate; run `npm run migrate` from a one-off task before/after deploy.
 - **Do not run `npm run seed` in production.** The seed script wipes existing seed slugs and inserts demo data.
 - **Set `SHORTENER_SCHEME=https`** in production so Helmet enables the strict CSP.
@@ -130,6 +168,7 @@ See [SECURITY.md](SECURITY.md) for supported versions, how to report vulnerabili
 - [Project memory](docs/memory.md)
 - [Roadmap](docs/roadmap.md)
 - [Decision log](docs/decisions/0001-stack.md)
+- [Auth ADR](docs/decisions/auth.md)
 
 ## License
 
