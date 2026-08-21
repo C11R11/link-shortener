@@ -55,6 +55,9 @@ export function renderLoginPage(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sign in &middot; Link Shortener</title>
+    <link rel="icon" href="/admin/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/admin/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/admin/apple-touch-icon.png" />
     <style>${styles}</style>
   </head>
   <body>

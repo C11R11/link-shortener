@@ -18,6 +18,9 @@ export function layoutShell(config: AppConfig, content: string): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Link Shortener Admin</title>
+    <link rel="icon" href="/admin/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/admin/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/admin/apple-touch-icon.png" />
     <link rel="stylesheet" href="/admin/dashboard.styles.css" />
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
