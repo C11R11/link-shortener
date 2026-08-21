@@ -189,6 +189,44 @@ describe('dashboard handlers', () => {
     assert.ok(res.body.includes('A link with that slug already exists'));
   });
 
+  it('renders link detail with short link column on GET /admin/dashboard/links/:id/detail', async () => {
+    const link = makeLink();
+    const stats: LinkStats = makeStats({
+      link,
+      recentClicks: [
+        {
+          clickedAt: new Date('2026-07-13T12:00:00Z'),
+          referrer: 'https://google.com',
+          userAgent: 'Mozilla/5.0',
+          country: 'AR',
+          ipAddress: '127.0.0.1',
+        },
+      ],
+    });
+    const service: LinkService = {
+      async listLinks() { return [link]; },
+      async getLinkBySlug() { return link; },
+      async getLinkById() { return link; },
+      async createLink(input) { return makeLink(input as Partial<LinkRecord>); },
+      async updateLink() { return link; },
+      async disableLink() { return link; },
+      async recordClick() {},
+      async getLinkStats() { return stats; },
+    };
+    const app = await buildApp(service);
+    const cookies = await login(app);
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/dashboard/links/link-1/detail',
+      headers: { cookie: cookies },
+    });
+    assert.equal(res.statusCode, 200);
+    assert.ok(res.headers['content-type']?.includes('text/html'));
+    assert.ok(res.body.includes('short link'), 'expected the recent-clicks table to have a "short link" column header');
+    assert.ok(res.body.includes('href="http://localhost/demo"'), 'expected the short link href to use the configured base url and link slug');
+    assert.ok(res.body.includes('>/demo</a>'), 'expected the short link text to be "/demo"');
+  });
+
   it('create form markup includes onsubmit handler that disables the submit button', async () => {
     const app = await buildApp();
     const cookies = await login(app);

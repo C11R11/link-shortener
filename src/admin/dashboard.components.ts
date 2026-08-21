@@ -163,8 +163,8 @@ export function renderLinkDetail(stats: LinkStats, config: AppConfig, csrfToken?
       <div style="margin-top:16px">
         <h3 class="dash__section-title">$ recent-clicks --limit=10</h3>
         <table class="dash__table">
-          <thead><tr><th>timestamp</th><th>referrer</th><th>country</th><th>user agent</th><th>IP</th></tr></thead>
-          <tbody>${stats.recentClicks.map((c) => `<tr><td>${c.clickedAt.toISOString()}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(c.country ?? '-')}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>short link</th><th>timestamp</th><th>referrer</th><th>country</th><th>user agent</th><th>IP</th></tr></thead>
+          <tbody>${stats.recentClicks.map((c) => `<tr><td><a class="dash__link" href="${escapeHtml(getBaseUrl(config) + '/' + stats.link.slug)}" target="_blank">/${escapeHtml(stats.link.slug)}</a></td><td>${c.clickedAt.toISOString()}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(c.country ?? '-')}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
         </table>
       </div>
       <div style="margin-top:16px">
