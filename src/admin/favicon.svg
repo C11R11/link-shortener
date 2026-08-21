@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Link Shortener clicks chart</title>
+  <desc id="desc">A bright green clicks graph on a dark rounded square.</desc>
+  <rect width="512" height="512" rx="112" fill="#0b0b0b"/>
+  <path
+    d="M86 367 C138 354 168 313 214 288 C256 265 281 155 340 163 C379 169 401 230 426 121"
+    fill="none"
+    stroke="#22c55e"
+    stroke-width="42"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="86" cy="367" r="28" fill="#0b0b0b" stroke="#22c55e" stroke-width="20"/>
+  <circle cx="214" cy="288" r="28" fill="#0b0b0b" stroke="#22c55e" stroke-width="20"/>
+  <circle cx="340" cy="163" r="28" fill="#0b0b0b" stroke="#22c55e" stroke-width="20"/>
+  <circle cx="426" cy="121" r="28" fill="#22c55e"/>
+</svg>
