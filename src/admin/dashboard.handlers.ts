@@ -25,7 +25,7 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
 
     const body = `<div class="dash__container">
       ${renderHeader(config)}
-      ${renderStatsContainer(await statsService.getGlobalStats(period), period)}
+      ${renderStatsContainer(config, await statsService.getGlobalStats(period), period)}
       ${renderCreateForm(error, csrfToken)}
       ${renderLinksTable(config, items, statsById)}
     </div>`;
@@ -36,7 +36,7 @@ export function registerDashboard(app: FastifyInstance, config: AppConfig, links
   app.get('/admin/dashboard/stats', { preHandler: guards.requireAdminHtml }, async (request, reply) => {
     const period = normalizePeriod((request.query as { period?: string }).period);
     const stats = await statsService.getGlobalStats(period);
-    return reply.header('Cache-Control', 'no-store').type('text/html').send(renderStatsContainer(stats, period));
+    return reply.header('Cache-Control', 'no-store').type('text/html').send(renderStatsContainer(config, stats, period));
   });
 
   app.get('/admin/dashboard/links/:id/detail', { preHandler: guards.requireAdminHtml }, async (request, reply) => {

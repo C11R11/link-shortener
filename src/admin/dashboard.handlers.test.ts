@@ -74,6 +74,9 @@ function makeLinkService(link: LinkRecord | null = null): LinkService {
     async getLinkStats() {
       return link ? makeStats({ link }) : null;
     },
+    async getAllRecentClicks() {
+      return [];
+    },
   };
 }
 
@@ -127,7 +130,20 @@ describe('dashboard handlers', () => {
   });
 
   it('renders stats fragment when authenticated via session', async () => {
-    const app = await buildApp();
+    const link = makeLink();
+    const globalRow = {
+      clickedAt: new Date('2026-07-13T12:00:00Z'),
+      referrer: 'https://google.com',
+      userAgent: 'Mozilla/5.0',
+      country: 'AR',
+      ipAddress: '127.0.0.1',
+      linkId: link.id,
+      linkSlug: link.slug,
+      linkDestinationUrl: link.destinationUrl,
+    };
+    const service = makeLinkService(link);
+    service.getAllRecentClicks = async () => [globalRow];
+    const app = await buildApp(service);
     const cookies = await login(app);
     const res = await app.inject({
       method: 'GET',
@@ -137,6 +153,11 @@ describe('dashboard handlers', () => {
     assert.equal(res.statusCode, 200);
     assert.ok(res.headers['content-type']?.includes('text/html'));
     assert.ok(res.body.includes('stats --summary'));
+    assert.ok(res.body.includes('$ recent-clicks --limit=10'));
+    assert.ok(
+      res.body.includes('href="http://localhost/demo"'),
+      'expected the global recent-clicks table to render a short-link href using the configured base url and the link slug',
+    );
   });
 
   it('redirects POST /admin/links to /admin/dashboard?error=slug-exists on duplicate slug', async () => {
@@ -189,7 +210,7 @@ describe('dashboard handlers', () => {
     assert.ok(res.body.includes('A link with that slug already exists'));
   });
 
-  it('renders link detail with short link column on GET /admin/dashboard/links/:id/detail', async () => {
+  it('renders link detail without short link column in per-link recent-clicks', async () => {
     const link = makeLink();
     const stats: LinkStats = makeStats({
       link,
@@ -212,6 +233,7 @@ describe('dashboard handlers', () => {
       async disableLink() { return link; },
       async recordClick() {},
       async getLinkStats() { return stats; },
+      async getAllRecentClicks() { return []; },
     };
     const app = await buildApp(service);
     const cookies = await login(app);
@@ -222,9 +244,13 @@ describe('dashboard handlers', () => {
     });
     assert.equal(res.statusCode, 200);
     assert.ok(res.headers['content-type']?.includes('text/html'));
-    assert.ok(res.body.includes('short link'), 'expected the recent-clicks table to have a "short link" column header');
-    assert.ok(res.body.includes('href="http://localhost/demo"'), 'expected the short link href to use the configured base url and link slug');
-    assert.ok(res.body.includes('>/demo</a>'), 'expected the short link text to be "/demo"');
+    assert.ok(res.body.includes('timestamp'), 'expected the recent-clicks table to still have a "timestamp" column header');
+    assert.ok(res.body.includes('referrer'), 'expected the recent-clicks table to still have a "referrer" column header');
+    // The per-link recent-clicks table must NOT have a short-link column anymore.
+    assert.ok(
+      !/recent-clicks --limit=10[\s\S]*?<th>short link<\/th>/.test(res.body),
+      'expected the per-link recent-clicks table to no longer have a "short link" column header',
+    );
   });
 
   it('create form markup includes onsubmit handler that disables the submit button', async () => {

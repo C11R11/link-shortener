@@ -77,6 +77,9 @@ function makeLinkService(link: LinkRecord | null = null): LinkService {
     async getLinkStats() {
       return link ? stats : null;
     },
+    async getAllRecentClicks() {
+      return [];
+    },
   };
 }
 

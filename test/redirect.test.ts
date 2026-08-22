@@ -87,6 +87,9 @@ function makeService(
           } satisfies LinkStats
         : null;
     },
+    async getAllRecentClicks() {
+      return [];
+    },
   };
 }
 

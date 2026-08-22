@@ -61,6 +61,9 @@ function makeServiceThatThrows(message: string): LinkService {
     async getLinkStats() {
       return null;
     },
+    async getAllRecentClicks() {
+      return [];
+    },
   };
 }
 
@@ -87,6 +90,9 @@ function makeServiceForStats(): LinkService {
     async recordClick() {},
     async getLinkStats() {
       throw Object.assign(new Error('connection refused: postgres://user:secret@db:5432/shortener at port 5432'), { statusCode: 500 });
+    },
+    async getAllRecentClicks() {
+      return [];
     },
   };
 }
