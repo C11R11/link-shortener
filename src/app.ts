@@ -89,6 +89,18 @@ export type LinkService = {
     event: { referrer?: string | null; userAgent?: string | null; country?: string | null; ipHash?: string | null; ipAddress?: string | null },
   ): Promise<void>;
   getLinkStats(id: string): Promise<LinkStats | null>;
+  getAllRecentClicks(limit?: number): Promise<RecentClickRow[]>;
+};
+
+export type RecentClickRow = {
+  clickedAt: Date;
+  referrer: string | null;
+  userAgent: string | null;
+  country: string | null;
+  ipAddress: string | null;
+  linkId: string;
+  linkSlug: string;
+  linkDestinationUrl: string;
 };
 
 export function createApp(config: AppConfig, links: LinkService, auth: AuthService) {

@@ -1,4 +1,5 @@
 import type { LinkService, LinkStats } from '../app.js';
+import type { RecentClickRow } from './links.js';
 
 export type StatsPeriod = '24h' | '7d' | '30d';
 
@@ -8,9 +9,10 @@ export type GlobalStats = {
   clicksPerDay: number;
   topReferrer: string;
   chartData: Array<{ bucket: string; count: number }>;
+  recentClicks: RecentClickRow[];
 };
 
-export function createStatsService(links: Pick<LinkService, 'listLinks' | 'getLinkStats'>) {
+export function createStatsService(links: Pick<LinkService, 'listLinks' | 'getLinkStats' | 'getAllRecentClicks'>) {
   return {
     async getGlobalStats(period: StatsPeriod): Promise<GlobalStats> {
       const days = period === '24h' ? 1 : period === '7d' ? 7 : 30;
@@ -39,7 +41,9 @@ export function createStatsService(links: Pick<LinkService, 'listLinks' | 'getLi
       }
       const chartData = [...chartMap.entries()].sort().slice(-days).map(([bucket, count]) => ({ bucket, count }));
 
-      return { totalClicks, activeLinks, clicksPerDay, topReferrer, chartData };
+      const recentClicks = await links.getAllRecentClicks(10);
+
+      return { totalClicks, activeLinks, clicksPerDay, topReferrer, chartData, recentClicks };
     },
   };
 }

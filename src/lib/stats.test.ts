@@ -38,9 +38,10 @@ function makeStats(overrides: Partial<LinkStats> = {}): LinkStats {
 
 describe('createStatsService', () => {
   it('returns zeroed global stats when no links', async () => {
-    const links: Pick<LinkService, 'listLinks' | 'getLinkStats'> = {
+    const links: Pick<LinkService, 'listLinks' | 'getLinkStats' | 'getAllRecentClicks'> = {
       listLinks: async () => [],
       getLinkStats: async () => null,
+      getAllRecentClicks: async () => [],
     };
     const stats = createStatsService(links);
     const result = await stats.getGlobalStats('7d');
@@ -49,15 +50,29 @@ describe('createStatsService', () => {
     assert.equal(result.clicksPerDay, 0);
     assert.equal(result.topReferrer, '-');
     assert.deepEqual(result.chartData, []);
+    assert.deepEqual(result.recentClicks, []);
   });
 
   it('aggregates totals across links', async () => {
-    const links: Pick<LinkService, 'listLinks' | 'getLinkStats'> = {
+    const recentRows = [
+      {
+        clickedAt: new Date('2026-07-13T12:00:00Z'),
+        referrer: 'https://google.com',
+        userAgent: 'Mozilla/5.0',
+        country: 'AR',
+        ipAddress: '127.0.0.1',
+        linkId: 'a',
+        linkSlug: 'slug-a',
+        linkDestinationUrl: 'https://example.com/a',
+      },
+    ];
+    const links: Pick<LinkService, 'listLinks' | 'getLinkStats' | 'getAllRecentClicks'> = {
       listLinks: async () => [makeLink({ id: 'a' }), makeLink({ id: 'b', status: 'archived' })],
       getLinkStats: async (id) =>
         id === 'a'
           ? makeStats({ totalClicks: 100, clicksLast7Days: 50, topReferrers: [{ referrer: 'google.com', count: 80 }] })
           : makeStats({ totalClicks: 20, topReferrers: [{ referrer: 'google.com', count: 20 }] }),
+      getAllRecentClicks: async () => recentRows,
     };
     const stats = createStatsService(links);
     const result = await stats.getGlobalStats('7d');
@@ -65,5 +80,6 @@ describe('createStatsService', () => {
     assert.equal(result.activeLinks, 1);
     assert.equal(result.clicksPerDay, 17); // 120 / 7 rounded
     assert.equal(result.topReferrer, 'google.com');
+    assert.deepEqual(result.recentClicks, recentRows);
   });
 });

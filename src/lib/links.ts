@@ -14,6 +14,17 @@ export type NewLinkInput = {
   expiresAt?: Date | null;
 };
 
+export type RecentClickRow = {
+  clickedAt: Date;
+  referrer: string | null;
+  userAgent: string | null;
+  country: string | null;
+  ipAddress: string | null;
+  linkId: string;
+  linkSlug: string;
+  linkDestinationUrl: string;
+};
+
 export type LinkStats = {
   link: LinkRecord;
   totalClicks: number;
@@ -137,6 +148,23 @@ export function createLinkService(config: AppConfig) {
           updatedAt: new Date(),
         }).where(eq(links.id, link.id));
       });
+    },
+    async getAllRecentClicks(limit: number = 10): Promise<RecentClickRow[]> {
+      return db
+        .select({
+          clickedAt: linkClicks.clickedAt,
+          referrer: linkClicks.referrer,
+          userAgent: linkClicks.userAgent,
+          country: linkClicks.country,
+          ipAddress: linkClicks.ipAddress,
+          linkId: linkClicks.linkId,
+          linkSlug: links.slug,
+          linkDestinationUrl: links.destinationUrl,
+        })
+        .from(linkClicks)
+        .innerJoin(links, eq(linkClicks.linkId, links.id))
+        .orderBy(desc(linkClicks.clickedAt))
+        .limit(limit);
     },
     async getLinkStats(id: string): Promise<LinkStats | null> {
       const [link] = await db.select().from(links).where(eq(links.id, id)).limit(1);

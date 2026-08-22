@@ -81,11 +81,24 @@ function renderChartSectionBase(period: StatsPeriod, chartData: Array<{ bucket: 
   </section>`;
 }
 
-export function renderStatsContainer(stats: GlobalStats, period: StatsPeriod): string {
+export function renderStatsContainer(config: AppConfig, stats: GlobalStats, period: StatsPeriod): string {
   return `<div id="stats-container">
     ${renderKpiSection(stats)}
     ${renderChartSectionBase(period, stats.chartData)}
+    ${renderGlobalRecentClicksSection(config, stats.recentClicks)}
   </div>`;
+}
+
+function renderGlobalRecentClicksSection(config: AppConfig, recentClicks: GlobalStats['recentClicks']): string {
+  return `<section class="dash__section">
+    <div class="dash__section-header"><h2 class="dash__section-title">$ recent-clicks --limit=10</h2></div>
+    <div class="dash__section-body" style="padding:0">
+      <table class="dash__table">
+        <thead><tr><th>short link</th><th>timestamp</th><th>referrer</th><th>country</th><th>user agent</th><th>IP</th></tr></thead>
+        <tbody>${recentClicks.map((c) => `<tr><td><a class="dash__link" href="${escapeHtml(getBaseUrl(config) + '/' + c.linkSlug)}" target="_blank">/${escapeHtml(c.linkSlug)}</a></td><td>${escapeHtml(c.clickedAt.toISOString())}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(c.country ?? '-')}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </section>`;
 }
 
 export function renderCreateForm(error?: string, csrfToken?: string): string {
@@ -163,8 +176,8 @@ export function renderLinkDetail(stats: LinkStats, config: AppConfig, csrfToken?
       <div style="margin-top:16px">
         <h3 class="dash__section-title">$ recent-clicks --limit=10</h3>
         <table class="dash__table">
-          <thead><tr><th>short link</th><th>timestamp</th><th>referrer</th><th>country</th><th>user agent</th><th>IP</th></tr></thead>
-          <tbody>${stats.recentClicks.map((c) => `<tr><td><a class="dash__link" href="${escapeHtml(getBaseUrl(config) + '/' + stats.link.slug)}" target="_blank">/${escapeHtml(stats.link.slug)}</a></td><td>${c.clickedAt.toISOString()}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(c.country ?? '-')}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>timestamp</th><th>referrer</th><th>country</th><th>user agent</th><th>IP</th></tr></thead>
+          <tbody>${stats.recentClicks.map((c) => `<tr><td>${escapeHtml(c.clickedAt.toISOString())}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(c.country ?? '-')}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
         </table>
       </div>
       <div style="margin-top:16px">
