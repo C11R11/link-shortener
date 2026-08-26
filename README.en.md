@@ -15,7 +15,9 @@ You can purchase a HostGator VPS using [my affiliate link](https://go.peladonerd
 ### 1. Create the server and point your domain
 
 1. Create an Ubuntu VPS and write down its public IPv4 address.
-2. At your DNS provider, create an `A` record for the subdomain you want to use, for example:
+2. At your DNS provider, create an `A` record for the subdomain you want to use and point it to the VPS public IPv4 address. If HostGator manages your DNS, follow its official guide: [Manage DNS Records with HostGator](https://www.hostgator.com/help/article/manage-dns-records-with-hostgatorenom). If you use another provider's nameservers—Cloudflare, for example—create the record in that provider's control panel.
+
+   Example:
 
    ```text
    go.example.com -> 203.0.113.10
