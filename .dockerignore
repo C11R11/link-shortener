@@ -6,5 +6,12 @@ coverage
 .env
 .env.*
 README.md
+README.en.md
+CONTRIBUTING.md
+SECURITY.md
+LICENSE
 docs
-
+.markdownlint-cli2.jsonc
+Caddyfile
+docker-compose.yml
+compose.production.yml
