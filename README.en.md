@@ -4,6 +4,8 @@
 
 A self-hosted link shortener with an admin dashboard and click analytics, built to replace Bitly on a domain you control.
 
+![Link Shortener admin dashboard](docs/assets/admin-dashboard.png)
+
 ## Quick installation on a HostGator VPS
 
 > This guide requires a **VPS running Ubuntu 22.04, 24.04, or 26.04 with root/sudo access**. It does not work on a shared hosting plan.
