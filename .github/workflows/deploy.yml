@@ -51,7 +51,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/pablokbs/link-shortener
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long
@@ -67,13 +67,14 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: >-
+      (github.repository == 'pablokbs/link-shortener' || vars.DEPLOY_ENABLED == 'true') &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.PROD_HOST }}
-          username: deploy
-          key: ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            sudo /usr/local/bin/deploy-link-shortener.sh ${{ github.sha }}
+          host: ${{ secrets.DEPLOY_HOST || secrets.PROD_HOST }}
+          username: ${{ secrets.DEPLOY_USER || 'deploy' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY || secrets.PROD_SSH_KEY }}
+          script: ${{ vars.DEPLOY_COMMAND || format('sudo /usr/local/bin/deploy-link-shortener.sh {0}', github.sha) }}

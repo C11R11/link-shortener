@@ -6,21 +6,23 @@ Thanks for your interest in contributing to the link shortener.
 
 1. Fork and clone the repository.
 2. Install Node.js 22 and Docker.
-3. Copy `.env.example` to `.env` and fill in your values. At minimum set `ADMIN_TOKEN`, `DATABASE_URL`, and `SHORTENER_DOMAIN`.
+3. Copy `.env.example` to `.env` and fill in your values. At minimum set `SESSION_SECRET`, `DATABASE_URL`, and `SHORTENER_DOMAIN`.
 4. Start the stack:
 
    ```bash
    docker compose up --build -d
    ```
 
-5. Apply migrations and (optionally) seed demo data:
+5. The app container applies migrations when it starts. Create the first admin and optionally seed demo data:
 
    ```bash
-   npm run migrate
-   npm run seed   # local development only
+   docker compose exec app npm run create-admin -- \
+     --email=admin@example.com \
+     --password='choose-a-strong-password'
+   docker compose exec app npm run seed   # local development only
    ```
 
-6. Open `http://localhost:3000/admin/dashboard` and authenticate with `Authorization: Bearer <ADMIN_TOKEN>`.
+6. Open `http://localhost:3000/admin/login` and sign in with the admin credentials.
 
 ## Development Workflow
 

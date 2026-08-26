@@ -24,23 +24,23 @@ You can expect an acknowledgement within a reasonable time frame, followed by a 
 
 ## Current Known Considerations
 
-### Admin token
+### Authentication secrets
 
-The admin dashboard and write API are gated by a single `ADMIN_TOKEN` (sent as `Authorization: Bearer <token>` or `Basic <base64(:token)>`). Treat this value as a high-privilege secret:
+The admin dashboard uses session authentication with Argon2id password hashes, signed cookies, and CSRF protection. Treat `SESSION_SECRET` and administrator passwords as high-privilege secrets:
 
-- Use a long, randomly generated token (e.g. `openssl rand -hex 32`).
-- Never commit the token. `.env.example` ships with `change-me` as a placeholder only.
-- Rotate the token periodically and immediately if you suspect leakage.
-- In production, source it from a secrets manager rather than a plain `.env` file.
+- Generate a random `SESSION_SECRET` of at least 32 characters.
+- Never commit `.env` or `.env.production`.
+- Rotate administrator credentials immediately if you suspect leakage.
+- `ADMIN_TOKEN` is a deprecated compatibility fallback for the JSON API only. Do not enable it on new installations.
 
 ### Docker Compose defaults
 
-`docker-compose.yml` ships with development-only credentials (`shortener` / `shortener` for Postgres, `ADMIN_TOKEN=change-me` for the app) so the stack can boot out of the box. These are **not safe for production**:
+`docker-compose.yml` ships with development-only PostgreSQL credentials so the stack can boot locally. These are **not safe for production**:
 
 - Replace the Postgres credentials with strong, unique values and inject them via environment variables or a secrets manager.
-- Always set `ADMIN_TOKEN` to a long random value before exposing the service.
 - Do not publish the Postgres port (`5432`) on a publicly reachable interface in production.
 - Behind the app, place an HTTPS-terminating reverse proxy so `SHORTENER_SCHEME=https` matches the public URL.
+- For a single-server deployment, use `compose.production.yml`, which keeps PostgreSQL internal and exposes only Caddy on ports 80/443.
 
 ### Seed command
 
@@ -62,20 +62,18 @@ When the app runs over HTTPS, the strict CSP allows scripts from `https://unpkg.
 
 ## Known npm Audit Findings
 
-`npm audit` currently reports 5 vulnerabilities (4 moderate, 1 high).
+The dependency lockfile is audited before a public release. At the time of this update, the remaining findings are:
 
-### Drizzle ORM (high, runtime)
+### `geoip-country` / `ip-address` (high, runtime)
 
-- **Advisory:** [GHSA-gpj5-g38j-94v9](https://github.com/advisories/GHSA-gpj5-g38j-94v9) — SQL injection via improperly escaped SQL identifiers.
-- **Affected range:** `drizzle-orm < 0.45.2`.
-- **Pinned version:** `^0.43.1`.
-- **Status:** the fix is a breaking change (the identifier-escaping API changed in 0.45.x). The upgrade is tracked and deferred until the codebase is migrated to the new API. Until then, callers must continue to avoid passing untrusted strings as SQL identifiers (table/column names); the application does not do this today.
+- `geoip-country` depends on an affected `ip-address` release.
+- The application only uses the country lookup API and does not call the vulnerable HTML-emitting methods or use the result for SSRF decisions.
+- npm's suggested downgrade to `geoip-country@3.1.11` introduces multiple high-severity advisories from abandoned transitive packages, so it is not a safe remediation.
+- This remains tracked until the upstream package updates or the GeoIP provider is replaced.
 
-### `@esbuild-kit/*`, `drizzle-kit`, `esbuild` (moderate, dev-only)
+### `@esbuild-kit/*`, `drizzle-kit`, `esbuild` (moderate, development only)
 
 - **Advisory:** [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99) — esbuild dev-server request smuggling.
 - **Affected path:** transitive dependencies of `drizzle-kit` (devDependency) via the deprecated `@esbuild-kit/core-utils` and `@esbuild-kit/esm-loader` packages.
 - **Exposure:** development tooling only (`drizzle-kit push`, `drizzle-kit generate`, and the `tsx` loader). These packages are never loaded by the production runtime or by the test runner.
-- **Status:** the fix requires upgrading `drizzle-kit` to a release that drops `@esbuild-kit/*`, which is a breaking change. Tracked.
-
-`npm audit fix` (non-breaking) resolves nothing today; both findings require a breaking upgrade in the dependency chain. The Drizzle ORM SQL-injection finding is the only runtime-relevant issue and is tracked for the next breaking-change window.
+- **Status:** npm proposes a breaking downgrade of `drizzle-kit`; the vulnerable development server is not exposed by this project. Tracked.

@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=shortener
+      - POSTGRES_USER=shortener
+      - POSTGRES_PASSWORD
+    volumes:
+      - shortener_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortener -d shortener"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_PORT: 3000
+      SHORTENER_DOMAIN: ${SHORTENER_DOMAIN:?set SHORTENER_DOMAIN in .env.production}
+      SHORTENER_SCHEME: https
+      DATABASE_URL: postgres://shortener:${POSTGRES_PASSWORD}@db:5432/shortener
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env.production}
+      SESSION_MAX_AGE_SECONDS: ${SESSION_MAX_AGE_SECONDS:-604800}
+      REDIRECT_STATUS_CODE: ${REDIRECT_STATUS_CODE:-302}
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      SHORTENER_DOMAIN: ${SHORTENER_DOMAIN:?set SHORTENER_DOMAIN in .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  shortener_pgdata:
+  caddy_data:
+  caddy_config:
