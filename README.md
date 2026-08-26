@@ -8,7 +8,7 @@ Acortador de enlaces autohospedado con dominio propio, panel administrativo y an
 
 > Esta guía requiere un **VPS con Ubuntu 22.04, 24.04 o 26.04 y acceso root/sudo**. No funciona en un plan de hosting compartido.
 
-Podés contratar un VPS en HostGator usando [mi enlace](https://go.peladonerd.com/hostgator). Es un enlace de afiliado: el precio para vos no cambia y ayuda a mantener el proyecto.
+Podés contratar un VPS en HostGator usando [mi enlace](https://go.peladonerd.com/hostgator). Es un enlace de afiliado: obtenés un descuento especial —cuyo valor puede variar— y, además, ayudás a mantener el proyecto.
 
 ### 1. Crear el servidor y apuntar el dominio
 

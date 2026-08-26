@@ -8,7 +8,7 @@ A self-hosted link shortener with an admin dashboard and click analytics, built 
 
 > This guide requires a **VPS running Ubuntu 22.04, 24.04, or 26.04 with root/sudo access**. It does not work on a shared hosting plan.
 
-You can purchase a HostGator VPS using [my affiliate link](https://go.peladonerd.com/hostgator). The price does not change for you, and it helps support the project.
+You can purchase a HostGator VPS using [my affiliate link](https://go.peladonerd.com/hostgator). You receive a special discount—the amount may vary—and also help support the project.
 
 ### 1. Create the server and point your domain
 
