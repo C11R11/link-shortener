@@ -4,6 +4,140 @@
 
 A self-hosted link shortener with an admin dashboard and click analytics, built to replace Bitly on a domain you control.
 
+## Quick installation on a HostGator VPS
+
+> This guide requires a **VPS running Ubuntu 22.04, 24.04, or 26.04 with root/sudo access**. It does not work on a shared hosting plan.
+
+You can purchase a HostGator VPS using [my affiliate link](https://go.peladonerd.com/hostgator). The price does not change for you, and it helps support the project.
+
+### 1. Create the server and point your domain
+
+1. Create an Ubuntu VPS and write down its public IPv4 address.
+2. At your DNS provider, create an `A` record for the subdomain you want to use, for example:
+
+   ```text
+   go.example.com -> 203.0.113.10
+   ```
+
+3. Wait until the DNS record resolves to the VPS.
+4. Make sure TCP ports `80` and `443` are allowed by the HostGator firewall and the server firewall.
+
+### 2. Install Docker Engine and Docker Compose
+
+Use the [official Docker repository for Ubuntu](https://docs.docker.com/engine/install/ubuntu/):
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl git
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+
+sudo docker run --rm hello-world
+sudo docker compose version
+```
+
+You do not need to install Node.js, npm, PostgreSQL, Caddy, or Certbot on the host. They run inside containers.
+
+### 3. Download and configure Link Shortener
+
+```bash
+git clone https://github.com/pablokbs/link-shortener.git
+cd link-shortener
+cp .env.production.example .env.production
+chmod 600 .env.production
+```
+
+Edit `.env.production` and replace every example value:
+
+```bash
+nano .env.production
+```
+
+Generate secure values with:
+
+```bash
+openssl rand -hex 32
+openssl rand -base64 48
+```
+
+- `SHORTENER_DOMAIN`: hostname only, without `https://` or a trailing slash.
+- `POSTGRES_PASSWORD`: use the generated hexadecimal value.
+- `SESSION_SECRET`: use the Base64 value; it must contain at least 32 characters.
+
+### 4. Start the application with HTTPS
+
+```bash
+sudo docker compose --env-file .env.production \
+  -f compose.production.yml up --build -d
+
+sudo docker compose --env-file .env.production \
+  -f compose.production.yml ps
+```
+
+The production stack includes:
+
+- Link Shortener;
+- PostgreSQL, available only inside the Docker network;
+- Caddy as the reverse proxy;
+- automatic Let's Encrypt certificate issuance and renewal.
+
+Check the service:
+
+```bash
+curl "https://$(grep '^SHORTENER_DOMAIN=' .env.production | cut -d= -f2)/healthz"
+```
+
+### 5. Create the first administrator
+
+```bash
+sudo docker compose --env-file .env.production \
+  -f compose.production.yml exec app \
+  npm run create-admin -- \
+  --email=admin@example.com \
+  --password='replace-with-a-long-password'
+```
+
+Then open:
+
+```text
+https://go.example.com/admin/login
+```
+
+> The password above may remain in your shell history. Remove that history entry or rotate the password from the dashboard after verifying access. Interactive password input is planned for the administration command.
+
+### Daily operations
+
+```bash
+# View logs
+sudo docker compose --env-file .env.production -f compose.production.yml logs -f
+
+# Update to the latest version
+git pull --ff-only
+sudo docker compose --env-file .env.production \
+  -f compose.production.yml up --build -d
+
+# Stop the stack without deleting data
+sudo docker compose --env-file .env.production \
+  -f compose.production.yml down
+```
+
+Persistent data lives in Docker volumes. Do not use `down -v` unless you intend to delete the database and certificates.
+
 ## Features
 
 - Short, branded URLs on a domain you own.
@@ -52,8 +186,6 @@ docker compose exec app npm run create-admin -- \
 > `DATABASE_URL` / `SESSION_SECRET` / `SHORTENER_DOMAIN`).
 
 Open the dashboard at `http://localhost:3000/admin/dashboard` and log in with the admin credentials you created above.
-
-For a production deployment with Caddy and automatic Let's Encrypt certificates, follow the [HostGator VPS guide in the Spanish README](README.md#instalación-rápida-en-un-vps-de-hostgator).
 
 ## Environment Variables
 
@@ -158,6 +290,25 @@ The test suite is `node:test` with `tsx` as the loader. Integration tests live i
 - **Run with `NODE_ENV=production`** to disable Fastify's development error details.
 - **Front the app with HTTPS** (Caddy, Nginx, or a CDN) so the redirect URL matches `SHORTENER_SCHEME`.
 - Use `compose.production.yml` for a single-server deployment with internal PostgreSQL and Caddy-managed TLS. The default `docker-compose.yml` is for development only.
+
+### Reusing the GitHub Actions deployment workflow
+
+The included workflow always runs validation on pull requests. On pushes to `main`, it builds and publishes the image as `ghcr.io/<owner>/<repository>`.
+
+Remote deployment is disabled by default in forks. To enable it in your own repository, configure:
+
+**Actions variables** (`Settings -> Secrets and variables -> Actions -> Variables`):
+
+- `DEPLOY_ENABLED`: `true`.
+- `DEPLOY_COMMAND`: command executed on the server after the image is published. It may use `${{ github.sha }}` only if you put that expression directly in your copied workflow; repository variable values are passed as plain text. Example: `cd /opt/link-shortener && ./deploy.sh`.
+
+**Actions secrets** (`Settings -> Secrets and variables -> Actions -> Secrets`):
+
+- `DEPLOY_HOST`: server hostname or IP address.
+- `DEPLOY_USER`: SSH user.
+- `DEPLOY_SSH_KEY`: private SSH key authorized for that user.
+
+The remote command is responsible for pulling the new image or source and restarting the stack. Keep the private key in GitHub Actions secrets—never commit it or store it in a repository variable.
 
 ## Contributing
 

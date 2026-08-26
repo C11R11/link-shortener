@@ -217,6 +217,25 @@ La aplicación valida la configuración al arrancar y falla inmediatamente si fa
 - No ejecutes `npm run seed` contra producción.
 - Consultá [SECURITY.md](SECURITY.md) para reportar vulnerabilidades.
 
+## Reutilizar el workflow de deploy
+
+El workflow incluido siempre ejecuta validaciones en los pull requests. Cuando hay un push a `main`, construye y publica la imagen como `ghcr.io/<owner>/<repositorio>`.
+
+El deploy remoto está deshabilitado de forma predeterminada en los forks. Para habilitarlo en tu propio repositorio, configurá:
+
+**Variables de Actions** (`Settings -> Secrets and variables -> Actions -> Variables`):
+
+- `DEPLOY_ENABLED`: `true`.
+- `DEPLOY_COMMAND`: comando que se ejecutará en el servidor después de publicar la imagen. Los valores de variables se pasan como texto plano; si necesitás `${{ github.sha }}`, escribí esa expresión directamente en tu copia del workflow. Ejemplo: `cd /opt/link-shortener && ./deploy.sh`.
+
+**Secrets de Actions** (`Settings -> Secrets and variables -> Actions -> Secrets`):
+
+- `DEPLOY_HOST`: hostname o dirección IP del servidor.
+- `DEPLOY_USER`: usuario SSH.
+- `DEPLOY_SSH_KEY`: clave SSH privada autorizada para ese usuario.
+
+El comando remoto debe descargar la imagen o el código nuevo y reiniciar el stack. Guardá la clave privada únicamente como secret de GitHub Actions: nunca la subas al repositorio ni la guardes como variable.
+
 ## Documentación
 
 - [Arquitectura](docs/architecture.md)
