@@ -4,6 +4,8 @@
 
 Acortador de enlaces autohospedado con dominio propio, panel administrativo y analíticas de clics. Está construido con Node.js, Fastify, PostgreSQL y Docker.
 
+![Panel administrativo de Link Shortener](docs/assets/admin-dashboard.png)
+
 ## Instalación rápida en un VPS de HostGator
 
 > Esta guía requiere un **VPS con Ubuntu 22.04, 24.04 o 26.04 y acceso root/sudo**. No funciona en un plan de hosting compartido.
