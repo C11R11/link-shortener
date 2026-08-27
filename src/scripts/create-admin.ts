@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { Writable } from 'node:stream';
+import { createInterface } from 'node:readline';
 import { eq } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
 import { users } from '../db/schema.js';
@@ -8,6 +11,7 @@ import { loadConfig } from '../config.js';
 interface ParsedArgs {
   email?: string;
   password?: string;
+  passwordStdin?: boolean;
   name?: string;
 }
 
@@ -34,17 +38,48 @@ function parseArgs(argv: string[]): ParsedArgs {
 
     if (key === 'email') out.email = value;
     else if (key === 'password') out.password = value;
+    else if (key === 'password-stdin') out.passwordStdin = true;
     else if (key === 'name') out.name = value;
   }
   return out;
 }
 
 function printUsage(): void {
-  console.error('Usage: create-admin --email <email> --password <password> [--name <name>]');
+  console.error(
+    'Usage: create-admin --email <email> (--password <password> | --password-stdin) [--name <name>]',
+  );
+}
+
+async function promptForPassword(): Promise<string> {
+  class MutedOutput extends Writable {
+    muted = false;
+
+    override _write(chunk: Buffer, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
+      if (!this.muted) process.stdout.write(chunk, encoding);
+      callback();
+    }
+  }
+
+  const output = new MutedOutput();
+  const rl = createInterface({ input: process.stdin, output, terminal: true });
+  const password = await new Promise<string>((resolve) => {
+    rl.question('Administrator password: ', (answer) => resolve(answer));
+    output.muted = true;
+  });
+  output.muted = false;
+  process.stdout.write('\n');
+  rl.close();
+  return password;
 }
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  if (args.passwordStdin) {
+    args.password = readFileSync(0, 'utf8').replace(/[\r\n]+$/, '');
+  } else if (!args.password && process.stdin.isTTY) {
+    args.password = await promptForPassword();
+  }
+
   if (!args.email || !args.password) {
     printUsage();
     process.exit(1);

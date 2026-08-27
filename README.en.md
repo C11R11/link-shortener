@@ -112,8 +112,7 @@ curl "https://$(grep '^SHORTENER_DOMAIN=' .env.production | cut -d= -f2)/healthz
 sudo docker compose --env-file .env.production \
   -f compose.production.yml exec app \
   npm run create-admin -- \
-  --email=admin@example.com \
-  --password='replace-with-a-long-password'
+  --email=admin@example.com
 ```
 
 Then open:
@@ -122,7 +121,8 @@ Then open:
 https://go.example.com/admin/login
 ```
 
-> The password above may remain in your shell history. Remove that history entry or rotate the password from the dashboard after verifying access. Interactive password input is planned for the administration command.
+The command prompts for the password interactively without echoing it, keeping
+it out of shell history and process arguments.
 
 ### Daily operations
 
