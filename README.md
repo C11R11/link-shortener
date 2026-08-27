@@ -112,8 +112,7 @@ curl "https://$(grep '^SHORTENER_DOMAIN=' .env.production | cut -d= -f2)/healthz
 sudo docker compose --env-file .env.production \
   -f compose.production.yml exec app \
   npm run create-admin -- \
-  --email=admin@example.com \
-  --password='reemplazar-por-una-contraseña-larga'
+  --email=admin@example.com
 ```
 
 Después ingresá en:
@@ -122,7 +121,8 @@ Después ingresá en:
 https://go.example.com/admin/login
 ```
 
-> La contraseña anterior puede quedar en el historial de la terminal. Borrá esa línea del historial o rotala desde el panel apenas confirmes el acceso. Está pendiente agregar entrada interactiva al comando de administración.
+El comando pide la contraseña de forma interactiva y oculta, sin guardarla en el
+historial ni en los argumentos del proceso.
 
 ### Operación diaria
 
