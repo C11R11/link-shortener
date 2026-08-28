@@ -1,6 +1,7 @@
 import { getBaseUrl, type AppConfig } from '../config.js';
 import type { LinkRecord, LinkStats } from '../app.js';
 import type { GlobalStats, StatsPeriod } from '../lib/stats.js';
+import { countryCodeToFlag } from '../lib/geo.js';
 
 export function escapeHtml(raw: string): string {
   return raw
@@ -98,7 +99,7 @@ function renderGlobalRecentClicksSection(config: AppConfig, recentClicks: Global
     <div class="dash__section-body" style="padding:0">
       <table class="dash__table">
         <thead><tr><th>short link</th><th>timestamp</th><th>referrer</th><th>country</th><th>user agent</th><th>IP</th></tr></thead>
-        <tbody>${recentClicks.map((c) => `<tr><td><a class="dash__link" href="${escapeHtml(getBaseUrl(config) + '/' + c.linkSlug)}" target="_blank">/${escapeHtml(c.linkSlug)}</a></td><td>${escapeHtml(c.clickedAt.toISOString())}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(c.country ?? '-')}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
+        <tbody>${recentClicks.map((c) => `<tr><td><a class="dash__link" href="${escapeHtml(getBaseUrl(config) + '/' + c.linkSlug)}" target="_blank">/${escapeHtml(c.linkSlug)}</a></td><td>${escapeHtml(c.clickedAt.toISOString())}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(countryCodeToFlag(c.country))}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
       </table>
     </div>
   </section>`;
@@ -180,7 +181,7 @@ export function renderLinkDetail(stats: LinkStats, config: AppConfig, csrfToken?
         <h3 class="dash__section-title">$ recent-clicks --limit=10</h3>
         <table class="dash__table">
           <thead><tr><th>timestamp</th><th>referrer</th><th>country</th><th>user agent</th><th>IP</th></tr></thead>
-          <tbody>${stats.recentClicks.map((c) => `<tr><td>${escapeHtml(c.clickedAt.toISOString())}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(c.country ?? '-')}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
+          <tbody>${stats.recentClicks.map((c) => `<tr><td>${escapeHtml(c.clickedAt.toISOString())}</td><td>${escapeHtml(c.referrer ?? '-')}</td><td>${escapeHtml(countryCodeToFlag(c.country))}</td><td>${escapeHtml(c.userAgent ?? '-')}</td><td>${escapeHtml(c.ipAddress ?? '-')}</td></tr>`).join('')}</tbody>
         </table>
       </div>
       <div style="margin-top:16px">
