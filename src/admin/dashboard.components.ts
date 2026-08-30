@@ -70,7 +70,7 @@ function renderKpi(label: string, value: string): string {
 }
 
 function renderChartSectionBase(period: StatsPeriod, chartData: Array<{ bucket: string; count: number }>): string {
-  const labels = escapeHtml(JSON.stringify(chartData.map((d) => d.bucket)));
+  const labels = escapeHtml(JSON.stringify(chartData.map((d) => (period === '24h' ? d.bucket.slice(11) : d.bucket))));
   const values = escapeHtml(JSON.stringify(chartData.map((d) => d.count)));
   return `<section class="dash__section" id="chart-section" data-chart='${labels}' data-values='${values}'>
     <div class="dash__section-header">

@@ -50,7 +50,7 @@ function makeStats(overrides: Partial<LinkStats> = {}): LinkStats {
   };
 }
 
-function makeLinkService(link: LinkRecord | null = null): LinkService {
+function makeLinkService(link: LinkRecord | null = null, stats: LinkStats | null = null): LinkService {
   return {
     async listLinks() {
       return link ? [link] : [];
@@ -72,12 +72,28 @@ function makeLinkService(link: LinkRecord | null = null): LinkService {
     },
     async recordClick() {},
     async getLinkStats() {
+      if (stats) return stats;
       return link ? makeStats({ link }) : null;
     },
     async getAllRecentClicks() {
       return [];
     },
   };
+}
+
+function parseDataChartAttribute(html: string): string[] {
+  const match = html.match(/data-chart='([^']*)'/);
+  if (!match) {
+    throw new Error('expected response HTML to contain a data-chart attribute');
+  }
+  // The JSON labels are embedded via escapeHtml, so double-quotes are rendered
+  // as &quot;. Unescape the minimal set needed for valid JSON before parsing.
+  const unescaped = match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const parsed = JSON.parse(unescaped);
+  if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === 'string')) {
+    throw new Error('expected data-chart attribute to decode to a string[]');
+  }
+  return parsed;
 }
 
 async function buildApp(service: LinkService = makeLinkService()) {
@@ -158,6 +174,66 @@ describe('dashboard handlers', () => {
       res.body.includes('href="http://localhost/demo"'),
       'expected the global recent-clicks table to render a short-link href using the configured base url and the link slug',
     );
+  });
+
+  it('renders 24h stats fragment with HH:00 labels in data-chart (no full date prefix)', async () => {
+    const link = makeLink();
+    const stats: LinkStats = makeStats({
+      link,
+      clicksByHour: [
+        { bucket: '2026-07-13 14:00', count: 5 },
+        { bucket: '2026-07-13 15:00', count: 3 },
+      ],
+    });
+    const app = await buildApp(makeLinkService(link, stats));
+    const cookies = await login(app);
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/dashboard/stats?period=24h',
+      headers: { cookie: cookies },
+    });
+    assert.equal(res.statusCode, 200);
+    const labels = parseDataChartAttribute(res.body);
+    assert.equal(labels.length, 24, `expected 24 hourly labels, got ${labels.length}`);
+    for (const label of labels) {
+      assert.match(
+        label,
+        /^\d{2}:00$/,
+        `expected HH:00 label for period=24h, got "${label}"`,
+      );
+      assert.ok(
+        !label.includes('2026-'),
+        `expected labels to be HH:00 only, got "${label}"`,
+      );
+    }
+  });
+
+  it('renders 7d stats fragment with YYYY-MM-DD labels in data-chart', async () => {
+    const link = makeLink();
+    const stats: LinkStats = makeStats({
+      link,
+      clicksByDay: [
+        { bucket: '2026-07-10', count: 4 },
+        { bucket: '2026-07-13', count: 9 },
+      ],
+    });
+    const app = await buildApp(makeLinkService(link, stats));
+    const cookies = await login(app);
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/dashboard/stats?period=7d',
+      headers: { cookie: cookies },
+    });
+    assert.equal(res.statusCode, 200);
+    const labels = parseDataChartAttribute(res.body);
+    assert.equal(labels.length, 7, `expected 7 daily labels, got ${labels.length}`);
+    for (const label of labels) {
+      assert.match(
+        label,
+        /^\d{4}-\d{2}-\d{2}$/,
+        `expected YYYY-MM-DD label for period=7d, got "${label}"`,
+      );
+    }
   });
 
   it('redirects POST /admin/links to /admin/dashboard?error=slug-exists on duplicate slug', async () => {

@@ -12,9 +12,63 @@ export type GlobalStats = {
   recentClicks: RecentClickRow[];
 };
 
+export type GetGlobalStatsOptions = {
+  now?: Date;
+};
+
+function pad2(n: number): string {
+  return n.toString().padStart(2, '0');
+}
+
+function formatHourBucket(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = pad2(d.getUTCMonth() + 1);
+  const day = pad2(d.getUTCDate());
+  const h = pad2(d.getUTCHours());
+  return `${y}-${m}-${day} ${h}:00`;
+}
+
+function formatDayBucket(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = pad2(d.getUTCMonth() + 1);
+  const day = pad2(d.getUTCDate());
+  return `${y}-${m}-${day}`;
+}
+
+function buildBuckets(period: StatsPeriod, now: Date): Array<{ bucket: string; count: number }> {
+  const buckets: Array<{ bucket: string; count: number }> = [];
+  if (period === '24h') {
+    const last = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      0, 0, 0,
+    ));
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(last.getTime() - i * 60 * 60 * 1000);
+      buckets.push({ bucket: formatHourBucket(d), count: 0 });
+    }
+  } else {
+    const count = period === '7d' ? 7 : 30;
+    const last = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      0, 0, 0, 0,
+    ));
+    for (let i = count - 1; i >= 0; i--) {
+      const d = new Date(last.getTime() - i * 24 * 60 * 60 * 1000);
+      buckets.push({ bucket: formatDayBucket(d), count: 0 });
+    }
+  }
+  return buckets;
+}
+
 export function createStatsService(links: Pick<LinkService, 'listLinks' | 'getLinkStats' | 'getAllRecentClicks'>) {
   return {
-    async getGlobalStats(period: StatsPeriod): Promise<GlobalStats> {
+    async getGlobalStats(period: StatsPeriod, options?: GetGlobalStatsOptions): Promise<GlobalStats> {
+      const now = options?.now ? new Date(options.now) : new Date();
       const days = period === '24h' ? 1 : period === '7d' ? 7 : 30;
       const items = await links.listLinks();
       const stats = await Promise.all(items.map((item) => links.getLinkStats(item.id)));
@@ -35,11 +89,13 @@ export function createStatsService(links: Pick<LinkService, 'listLinks' | 'getLi
       const chartMap = new Map<string, number>();
       for (const s of stats) {
         if (!s) continue;
-        for (const { bucket, count } of s.clicksByDay) {
+        const rows = period === '24h' ? s.clicksByHour : s.clicksByDay;
+        for (const { bucket, count } of rows) {
           chartMap.set(bucket, (chartMap.get(bucket) ?? 0) + count);
         }
       }
-      const chartData = [...chartMap.entries()].sort().slice(-days).map(([bucket, count]) => ({ bucket, count }));
+      const buckets = buildBuckets(period, now);
+      const chartData = buckets.map(({ bucket }) => ({ bucket, count: chartMap.get(bucket) ?? 0 }));
 
       const recentClicks = await links.getAllRecentClicks(10);
 
