@@ -8,7 +8,7 @@ A self-hosted link shortener with an admin dashboard and click analytics, built 
 
 ## Quick installation on a HostGator VPS
 
-> This guide requires a **VPS running Ubuntu 22.04, 24.04, or 26.04 with root/sudo access**. It does not work on a shared hosting plan.
+> This guide requires a **VPS running Ubuntu 22.04, 24.04, or 26.04 and an SSH session as `root`**. All commands below assume you are already logged in as `root`. It does not work on a shared hosting plan.
 
 You can purchase a HostGator VPS using [my affiliate link](https://go.peladonerd.com/hostgator). You receive a special discount—the amount may vary—and also help support the project.
 
@@ -31,14 +31,14 @@ You can purchase a HostGator VPS using [my affiliate link](https://go.peladonerd
 Use the [official Docker repository for Ubuntu](https://docs.docker.com/engine/install/ubuntu/):
 
 ```bash
-sudo apt update
-sudo apt install -y ca-certificates curl git
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+apt update
+apt install -y ca-certificates curl git
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
   -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
 
-sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
 Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
@@ -47,12 +47,12 @@ Architectures: $(dpkg --print-architecture)
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io \
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io \
   docker-buildx-plugin docker-compose-plugin
 
-sudo docker run --rm hello-world
-sudo docker compose version
+docker run --rm hello-world
+docker compose version
 ```
 
 You do not need to install Node.js, npm, PostgreSQL, Caddy, or Certbot on the host. They run inside containers.
@@ -86,10 +86,10 @@ openssl rand -base64 48
 ### 4. Start the application with HTTPS
 
 ```bash
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml up --build -d
 
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml ps
 ```
 
@@ -109,7 +109,7 @@ curl "https://$(grep '^SHORTENER_DOMAIN=' .env.production | cut -d= -f2)/healthz
 ### 5. Create the first administrator
 
 ```bash
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml exec app \
   npm run create-admin -- \
   --email=admin@example.com
@@ -128,15 +128,15 @@ it out of shell history and process arguments.
 
 ```bash
 # View logs
-sudo docker compose --env-file .env.production -f compose.production.yml logs -f
+docker compose --env-file .env.production -f compose.production.yml logs -f
 
 # Update to the latest version
 git pull --ff-only
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml up --build -d
 
 # Stop the stack without deleting data
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml down
 ```
 

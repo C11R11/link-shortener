@@ -8,7 +8,7 @@ Acortador de enlaces autohospedado con dominio propio, panel administrativo y an
 
 ## Instalación rápida en un VPS de HostGator
 
-> Esta guía requiere un **VPS con Ubuntu 22.04, 24.04 o 26.04 y acceso root/sudo**. No funciona en un plan de hosting compartido.
+> Esta guía requiere un **VPS con Ubuntu 22.04, 24.04 o 26.04 y una sesión SSH como `root`**. Todos los comandos siguientes asumen que ya ingresaste como `root`. No funciona en un plan de hosting compartido.
 
 Podés contratar un VPS en HostGator usando [mi enlace](https://go.peladonerd.com/hostgator). Es un enlace de afiliado: obtenés un descuento especial —cuyo valor puede variar— y, además, ayudás a mantener el proyecto.
 
@@ -31,14 +31,14 @@ Podés contratar un VPS en HostGator usando [mi enlace](https://go.peladonerd.co
 Usá el [repositorio oficial de Docker para Ubuntu](https://docs.docker.com/engine/install/ubuntu/):
 
 ```bash
-sudo apt update
-sudo apt install -y ca-certificates curl git
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+apt update
+apt install -y ca-certificates curl git
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
   -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
 
-sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
 Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
@@ -47,12 +47,12 @@ Architectures: $(dpkg --print-architecture)
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io \
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io \
   docker-buildx-plugin docker-compose-plugin
 
-sudo docker run --rm hello-world
-sudo docker compose version
+docker run --rm hello-world
+docker compose version
 ```
 
 No hace falta instalar Node.js, npm, PostgreSQL, Caddy ni Certbot en el host: todo corre dentro de contenedores.
@@ -86,10 +86,10 @@ openssl rand -base64 48
 ### 4. Levantar la aplicación con HTTPS
 
 ```bash
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml up --build -d
 
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml ps
 ```
 
@@ -109,7 +109,7 @@ curl "https://$(grep '^SHORTENER_DOMAIN=' .env.production | cut -d= -f2)/healthz
 ### 5. Crear el primer administrador
 
 ```bash
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml exec app \
   npm run create-admin -- \
   --email=admin@example.com
@@ -128,15 +128,15 @@ historial ni en los argumentos del proceso.
 
 ```bash
 # Ver logs
-sudo docker compose --env-file .env.production -f compose.production.yml logs -f
+docker compose --env-file .env.production -f compose.production.yml logs -f
 
 # Actualizar a la última versión
 git pull --ff-only
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml up --build -d
 
 # Detener el stack sin borrar datos
-sudo docker compose --env-file .env.production \
+docker compose --env-file .env.production \
   -f compose.production.yml down
 ```
 
